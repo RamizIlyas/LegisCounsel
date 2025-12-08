@@ -8,18 +8,33 @@ import { Communication } from './components/Communication';
 import { AdminPanel } from './components/AdminPanel';
 import { SettingsPage } from './components/SettingsPage';
 import { Toaster } from './components/ui/sonner';
+import { SignupPage } from './components/SignupPage';
 
 export type UserRole = 'lawyer' | 'client' | 'admin' | null;
 
 export type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'cases' | 'communication' | 'admin' | 'settings';
+
+// export type User = {
+//   name: string;
+//   email: string;
+//   password: string;
+// };
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('landing');
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+
+//   const [user, setUser] = useState<User>({
+//   name: "",
+//   email: "",
+//   password: ""
+// });
+
   const handleLogin = (role: UserRole) => {
     setUserRole(role);
+    // setUser(user);
     setIsAuthenticated(true);
     setCurrentPage('dashboard');
   };
@@ -47,8 +62,9 @@ export default function App() {
       case 'landing':
         return <LandingPage onNavigate={handleNavigation} />;
       case 'login':
+        return <LoginPage onLogin={handleLogin} onNavigate={handleNavigation} />;
       case 'signup':
-        return <LoginPage mode={currentPage} onLogin={handleLogin} onNavigate={handleNavigation} />;
+        return <SignupPage onLogin={handleLogin} onNavigate={handleNavigation} />;
       case 'dashboard':
         if (userRole === 'admin') {
           return <AdminPanel onNavigate={handleNavigation} onLogout={handleLogout} />;

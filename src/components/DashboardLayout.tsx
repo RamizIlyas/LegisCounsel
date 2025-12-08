@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Avatar, AvatarFallback } from './ui/avatar';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -46,6 +47,23 @@ export function DashboardLayout({
   onRoleSwitch,
   searchBar
 }: DashboardLayoutProps) {
+  // Define a User interface
+// interface User {
+//   id: string;
+//   name: string;
+//   email: string;
+//   role: string;
+//   // Add other properties you expect from backend
+//   }
+
+  // In your component
+//   const [user, setUser] = useState<User | null>(null); // Specify type
+//   useEffect(() => {
+//     const auth = useAuth();
+//     setUser(auth.user);
+// }, []);
+  const {user} = useAuth();
+
   const menuItems = [
     { icon: Home, label: 'Home', page: 'dashboard' as Page },
     { icon: FileSearch, label: 'Legal Search', page: 'dashboard' as Page },
@@ -115,7 +133,7 @@ export function DashboardLayout({
                     </Avatar>
                     <div className="hidden md:block text-left">
                       <div className="text-sm text-[#1E293B]">
-                        {userRole === 'lawyer' ? 'John Doe' : userRole === 'client' ? 'Alice Client' : 'Admin User'}
+                        {userRole === "admin" ? "Admin" : user?.name}
                       </div>
                       <div className="text-xs text-gray-500 capitalize">{userRole}</div>
                     </div>

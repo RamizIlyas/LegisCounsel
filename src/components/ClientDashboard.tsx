@@ -96,7 +96,7 @@ export function ClientDashboard({ onNavigate, onLogout, onRoleSwitch }: ClientDa
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main Chat Area */}
         <div className="lg:col-span-2">
-          <Card className="h-[calc(100vh-12rem)]">
+          <Card className="h-[calc(100vh-12rem)] overflow-y-auto">
             <CardHeader className="border-b bg-gradient-to-r from-[#1E3A8A] to-[#1E3A8A]/80">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center">
@@ -224,7 +224,7 @@ export function ClientDashboard({ onNavigate, onLogout, onRoleSwitch }: ClientDa
                   onClick={() => handleSendMessage(question)}
                 >
                   <MessageCircle className="h-4 w-4 mr-2 flex-shrink-0" />
-                  <span className="text-sm">{question}</span>
+                  <span className="text-sm text-wrap">{question}</span>
                 </Button>
               ))}
             </CardContent>

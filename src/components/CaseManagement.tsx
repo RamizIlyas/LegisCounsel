@@ -30,7 +30,7 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import type { Page, UserRole } from '../App';
-// import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 
 interface CaseManagementProps {
   userRole: UserRole;
@@ -115,15 +115,15 @@ export function CaseManagement({ userRole, onNavigate, onLogout }: CaseManagemen
       setCases([...cases, caseToAdd]);
       setShowAddDialog(false);
       setNewCase({ name: '', client: '', caseType: '', nextHearing: '' });
-      alert('Case added successfully');
+      toast('Case added successfully');
     } else {
-      alert('Please fill in all required fields');
+      toast('Please fill in all required fields');
     }
   };
 
   const handleDeleteCase = (id: string) => {
     setCases(cases.filter(c => c.id !== id));
-    alert('Case deleted');
+    toast('Case deleted');
   };
 
   const getStatusIcon = (status: Case['status']) => {
