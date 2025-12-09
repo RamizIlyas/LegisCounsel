@@ -2,17 +2,19 @@ import { useState } from 'react';
 import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
 import { LawyerDashboard } from './components/LawyerDashboard';
-import { ClientDashboard } from './components/ClientDashboard';
+import {ClientDashboard} from './components/ClientDashboard';
 import { CaseManagement } from './components/CaseManagement';
 import { Communication } from './components/Communication';
 import { AdminPanel } from './components/AdminPanel';
 import { SettingsPage } from './components/SettingsPage';
 import { Toaster } from './components/ui/sonner';
 import { SignupPage } from './components/SignupPage';
+import { ManagementPanel } from './components/ManagementPanel';
+import {useAuth} from './contexts/AuthContext';
 
-export type UserRole = 'lawyer' | 'client' | 'admin' | null;
+export type UserRole = 'Lawyer' | 'Client' | 'Admin' | null;
 
-export type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'cases' | 'communication' | 'admin' | 'settings';
+export type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'cases' | 'communication' | 'admin' | 'management'| 'settings';
 
 // export type User = {
 //   name: string;
@@ -24,7 +26,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('landing');
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-
+  const {logout} = useAuth();
 
 //   const [user, setUser] = useState<User>({
 //   name: "",
@@ -34,7 +36,6 @@ export default function App() {
 
   const handleLogin = (role: UserRole) => {
     setUserRole(role);
-    // setUser(user);
     setIsAuthenticated(true);
     setCurrentPage('dashboard');
   };
@@ -43,6 +44,7 @@ export default function App() {
     setUserRole(null);
     setIsAuthenticated(false);
     setCurrentPage('landing');
+    logout();
   };
 
   const handleNavigation = (page: Page) => {
@@ -50,10 +52,10 @@ export default function App() {
   };
 
   const handleRoleSwitch = () => {
-    if (userRole === 'lawyer') {
-      setUserRole('client');
-    } else if (userRole === 'client') {
-      setUserRole('lawyer');
+    if (userRole === 'Lawyer') {
+      setUserRole('Client');
+    } else if (userRole === 'Client') {
+      setUserRole('Lawyer');
     }
   };
 
@@ -66,16 +68,18 @@ export default function App() {
       case 'signup':
         return <SignupPage onLogin={handleLogin} onNavigate={handleNavigation} />;
       case 'dashboard':
-        if (userRole === 'admin') {
+        if (userRole === 'Admin') {
           return <AdminPanel onNavigate={handleNavigation} onLogout={handleLogout} />;
         }
-        return userRole === 'lawyer' 
+        return userRole === 'Lawyer' 
           ? <LawyerDashboard onNavigate={handleNavigation} onLogout={handleLogout} onRoleSwitch={handleRoleSwitch} />
           : <ClientDashboard onNavigate={handleNavigation} onLogout={handleLogout} onRoleSwitch={handleRoleSwitch} />;
       case 'cases':
         return <CaseManagement userRole={userRole} onNavigate={handleNavigation} onLogout={handleLogout} />;
       case 'communication':
         return <Communication userRole={userRole} onNavigate={handleNavigation} onLogout={handleLogout} />;
+      case 'management':
+        return <ManagementPanel onNavigate={handleNavigation} onLogout={handleLogout} />;
       case 'admin':
         return <AdminPanel onNavigate={handleNavigation} onLogout={handleLogout} />;
       case 'settings':

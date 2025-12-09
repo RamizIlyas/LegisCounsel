@@ -9,6 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Search, Filter, FileText, Download, ExternalLink, TrendingUp, Scale, Calendar } from 'lucide-react';
 import type { Page, UserRole } from '../App';
+import { ClientDashboard } from './ClientDashboard';
+import { AiChatInterface } from './AiChatInterface';
 
 interface LawyerDashboardProps {
   onNavigate: (page: Page) => void;
@@ -96,7 +98,7 @@ export function LawyerDashboard({ onNavigate, onLogout, onRoleSwitch }: LawyerDa
 
   return (
     <DashboardLayout
-      userRole="lawyer"
+      userRole="Lawyer"
       currentPage="dashboard"
       onNavigate={onNavigate}
       onLogout={onLogout}
@@ -112,7 +114,7 @@ export function LawyerDashboard({ onNavigate, onLogout, onRoleSwitch }: LawyerDa
           </div>
           <Badge className="bg-[#1E3A8A] text-white">Lawyer View</Badge>
         </div>
-
+        
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -152,7 +154,7 @@ export function LawyerDashboard({ onNavigate, onLogout, onRoleSwitch }: LawyerDa
             </CardContent>
           </Card>
         </div>
-
+        <AiChatInterface/>
         {/* Search and Filters */}
         <Card>
           <CardHeader>

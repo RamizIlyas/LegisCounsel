@@ -48,35 +48,63 @@ export function DashboardLayout({
   searchBar
 }: DashboardLayoutProps) {
   // Define a User interface
-// interface User {
-//   id: string;
-//   name: string;
-//   email: string;
-//   role: string;
-//   // Add other properties you expect from backend
-//   }
 
-  // In your component
-//   const [user, setUser] = useState<User | null>(null); // Specify type
-//   useEffect(() => {
-//     const auth = useAuth();
-//     setUser(auth.user);
-// }, []);
   const {user} = useAuth();
+interface MenuItem {
+  icon: any;
+  label: string;
+  page: Page;
+  badge?: string; // <-- FIX
+}
 
-  const menuItems = [
-    { icon: Home, label: 'Home', page: 'dashboard' as Page },
-    { icon: FileSearch, label: 'Legal Search', page: 'dashboard' as Page },
-    { icon: Bookmark, label: 'Saved Cases', page: 'dashboard' as Page },
-    { icon: Bell, label: 'Notifications', badge: '3', page: 'dashboard' as Page },
-    { icon: Briefcase, label: 'Case Management', page: 'cases' as Page },
-    { icon: MessageSquare, label: 'Communication', page: 'communication' as Page },
-    { icon: Settings, label: 'Settings', page: 'settings' as Page },
-  ];
 
-  if (userRole === 'admin') {
-    menuItems.splice(1, 0, { icon: LayoutDashboard, label: 'Admin Panel', page: 'admin' as Page });
-  }
+
+  // const menuItems = [
+  //   { icon: Home, label: 'Home', page: 'dashboard' as Page },
+  //   { icon: FileSearch, label: 'Legal Search', page: 'dashboard' as Page },
+  //   { icon: Bookmark, label: 'Saved Cases', page: 'dashboard' as Page },
+  //   { icon: Bell, label: 'Notifications', badge: '3', page: 'dashboard' as Page },
+  //   { icon: Briefcase, label: 'Case Management', page: 'cases' as Page },
+  //   { icon: MessageSquare, label: 'Communication', page: 'communication' as Page },
+  //   { icon: Settings, label: 'Settings', page: 'settings' as Page },
+  // ];
+
+  // if (userRole === 'admin') {
+  //   menuItems.splice(1, 0, { icon: LayoutDashboard, label: 'Admin Panel', page: 'admin' as Page });
+  // }
+
+  const baseMenuItems:MenuItem [] = [
+  { icon: Home, label: "Home", page: "dashboard" as Page },
+  { icon: MessageSquare, label: "Communication", page: "communication" as Page },
+  { icon: Settings, label: "Settings", page: "settings" as Page },
+];
+
+const clientMenuExtras :MenuItem []= [
+  { icon: FileSearch, label: "Legal Search", page: "dashboard" as Page },
+  { icon: Bookmark, label: "Saved Cases", page: "dashboard" as Page },
+  { icon: Bell, label: "Notifications", badge: "3", page: "dashboard" as Page },
+  { icon: Briefcase, label: "Case Management", page: "cases" as Page },
+];
+
+const adminMenuExtras:MenuItem [] = [
+  { icon: LayoutDashboard, label: "Admin Panel", page: "admin" as Page },
+  { icon: Briefcase, label: "Management Panel", page: "management" as Page },
+];
+
+const menuItems =
+  userRole === "Admin"
+    ? [
+        baseMenuItems[0],        // Home
+        ...adminMenuExtras,      // Admin Panel + Case Management
+        baseMenuItems[2],        // Settings
+      ]
+    : [
+        baseMenuItems[0],        // Home, Communication, Settings
+        ...clientMenuExtras,     // Client → Legal Search, Saved Cases, etc.
+        baseMenuItems[1],
+        baseMenuItems[2],
+      ];
+
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -106,7 +134,7 @@ export function DashboardLayout({
             </div>
 
             <div className="flex items-center gap-3">
-              {userRole !== 'admin' && onRoleSwitch && (
+              {/* {userRole !== 'Admin' && onRoleSwitch && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -114,9 +142,9 @@ export function DashboardLayout({
                   className="hidden md:flex items-center gap-2 border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A]/10"
                 >
                   <ArrowLeftRight className="h-4 w-4" />
-                  Switch to {userRole === 'lawyer' ? 'Client' : 'Lawyer'} View
+                  Switch to {userRole === 'Lawyer' ? 'Client' : 'Lawyer'} View
                 </Button>
-              )}
+              )} */}
               
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5 text-gray-600" />
@@ -128,12 +156,12 @@ export function DashboardLayout({
                   <Button variant="ghost" className="flex items-center gap-2">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-[#1E3A8A] text-white">
-                        {userRole === 'lawyer' ? 'JD' : userRole === 'client' ? 'AC' : 'AD'}
+                        {userRole === 'Lawyer' ? 'JD' : userRole === 'Client' ? 'AC' : 'AD'}
                       </AvatarFallback>
                     </Avatar>
                     <div className="hidden md:block text-left">
                       <div className="text-sm text-[#1E293B]">
-                        {userRole === "admin" ? "Admin" : user?.name}
+                        {userRole === "Admin" ? user?.name : user?.name}
                       </div>
                       <div className="text-xs text-gray-500 capitalize">{userRole}</div>
                     </div>
@@ -146,12 +174,12 @@ export function DashboardLayout({
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
                   </DropdownMenuItem>
-                  {userRole !== 'admin' && onRoleSwitch && (
+                  {/* {userRole !== 'Admin' && onRoleSwitch && (
                     <DropdownMenuItem onClick={onRoleSwitch} className="md:hidden">
                       <ArrowLeftRight className="mr-2 h-4 w-4" />
-                      Switch to {userRole === 'lawyer' ? 'Client' : 'Lawyer'} View
+                      Switch to {userRole === 'Lawyer' ? 'Client' : 'Lawyer'} View
                     </DropdownMenuItem>
-                  )}
+                  )} */}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={onLogout} className="text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />

@@ -21,8 +21,12 @@ export function SignupPage({ onLogin, onNavigate }: SignupPageProps) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'lawyer' | 'client' | 'admin'>('lawyer');
+  const [role, setRole] = useState<'Lawyer' | 'Client'
+  //  | 'admin'
+                                                        >('Lawyer');
+
   const { login } = useAuth();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !name) return toast("Please fill in all fields");
@@ -127,9 +131,9 @@ export function SignupPage({ onLogin, onNavigate }: SignupPageProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="lawyer">Lawyer / Legal Professional</SelectItem>
-                      <SelectItem value="client">Client</SelectItem>
-                      <SelectItem value="admin">Administrator</SelectItem>
+                      <SelectItem value="Lawyer">Lawyer / Legal Professional</SelectItem>
+                      <SelectItem value="Client">Client</SelectItem>
+                      {/* <SelectItem value="admin">Administrator</SelectItem> */}
                     </SelectContent>
                   </Select>
                 </div>

@@ -41,18 +41,18 @@ const accuracyData = [
   { month: 'Jun', accuracy: 96 }
 ];
 
-const recentUsers = [
-  { id: '1', name: 'John Doe', email: 'john.doe@law.com', role: 'Lawyer', status: 'active', joined: '2025-10-15' },
-  { id: '2', name: 'Alice Client', email: 'alice@email.com', role: 'Client', status: 'active', joined: '2025-10-14' },
-  { id: '3', name: 'Robert Smith', email: 'robert.s@law.com', role: 'Lawyer', status: 'pending', joined: '2025-10-13' },
-  { id: '4', name: 'Maria Garcia', email: 'maria.g@email.com', role: 'Client', status: 'active', joined: '2025-10-12' },
-  { id: '5', name: 'James Wilson', email: 'james.w@law.com', role: 'Lawyer', status: 'inactive', joined: '2025-10-10' }
-];
+// const recentUsers = [
+//   { id: '1', name: 'John Doe', email: 'john.doe@law.com', role: 'Lawyer', status: 'active', joined: '2025-10-15' },
+//   { id: '2', name: 'Alice Client', email: 'alice@email.com', role: 'Client', status: 'active', joined: '2025-10-14' },
+//   { id: '3', name: 'Robert Smith', email: 'robert.s@law.com', role: 'Lawyer', status: 'pending', joined: '2025-10-13' },
+//   { id: '4', name: 'Maria Garcia', email: 'maria.g@email.com', role: 'Client', status: 'active', joined: '2025-10-12' },
+//   { id: '5', name: 'James Wilson', email: 'james.w@law.com', role: 'Lawyer', status: 'inactive', joined: '2025-10-10' }
+// ];
 
 export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
   return (
     <DashboardLayout
-      userRole="admin"
+      userRole="Admin"
       currentPage="admin"
       onNavigate={onNavigate}
       onLogout={onLogout}
@@ -219,83 +219,6 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
                 <span className="text-sm">67%</span>
               </div>
               <Progress value={67} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Users */}
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle className="text-[#1E293B]">User Management</CardTitle>
-                <CardDescription>Recently registered users</CardDescription>
-              </div>
-              <Button className="bg-[#1E3A8A] hover:bg-[#1E3A8A]/90">
-                <Users className="mr-2 h-4 w-4" />
-                Manage Users
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>{user.name}</TableCell>
-                      <TableCell className="text-gray-600">{user.email}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={
-                          user.role === 'Lawyer' 
-                            ? 'border-[#1E3A8A] text-[#1E3A8A]' 
-                            : 'border-[#D4AF37] text-[#D4AF37]'
-                        }>
-                          {user.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {user.status === 'active' && (
-                          <Badge className="bg-green-100 text-green-800 border-green-200">
-                            <CheckCircle2 className="mr-1 h-3 w-3" />
-                            Active
-                          </Badge>
-                        )}
-                        {user.status === 'pending' && (
-                          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                            <Clock className="mr-1 h-3 w-3" />
-                            Pending
-                          </Badge>
-                        )}
-                        {user.status === 'inactive' && (
-                          <Badge className="bg-gray-100 text-gray-800 border-gray-200">
-                            <XCircle className="mr-1 h-3 w-3" />
-                            Inactive
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-gray-600">
-                        {new Date(user.joined).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
             </div>
           </CardContent>
         </Card>
