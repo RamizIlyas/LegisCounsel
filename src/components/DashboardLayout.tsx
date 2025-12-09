@@ -161,7 +161,7 @@ const menuItems =
                     </Avatar>
                     <div className="hidden md:block text-left">
                       <div className="text-sm text-[#1E293B]">
-                        {userRole === "Admin" ? user?.name : user?.name}
+                        {user?.name ? user?.name : "Guest"}
                       </div>
                       <div className="text-xs text-gray-500 capitalize">{userRole}</div>
                     </div>
