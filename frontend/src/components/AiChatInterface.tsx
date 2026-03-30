@@ -1,34 +1,43 @@
 // AiChatInterface.tsx
-import { useState } from 'react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { Avatar, AvatarFallback } from './ui/avatar';
-import { ScrollArea } from './ui/scroll-area';
-import { Send, Bot, User, FileText, Scale, MessageCircle, Sparkles } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useState } from "react";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Avatar, AvatarFallback } from "./ui/avatar";
+import { ScrollArea } from "./ui/scroll-area";
+import {
+  Send,
+  Bot,
+  User,
+  FileText,
+  Scale,
+  MessageCircle,
+  Sparkles,
+} from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 
 interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   references?: { title: string; citation: string }[];
 }
 
 const initialMessages: Message[] = [
   {
-    id: '1',
-    role: 'assistant',
-    content: 'Hello! I\'m your AI legal assistant. You can ask me questions about legal matters in simple language, and I\'ll help you understand the relevant laws and precedents. How can I help you today?'
-  }
+    id: "1",
+    role: "assistant",
+    content:
+      "Hello! I'm your AI legal assistant. You can ask me questions about legal matters in simple language, and I'll help you understand the relevant laws and precedents. How can I help you today?",
+  },
 ];
 
 const quickQuestions = [
-  'What are my rights as a tenant?',
-  'How does small claims court work?',
-  'What is breach of contract?',
-  'Explain employment discrimination laws'
+  "What are my rights as a tenant?",
+  "How does small claims court work?",
+  "What is breach of contract?",
+  "Explain employment discrimination laws",
 ];
 
 interface AiChatInterfaceProps {
@@ -36,57 +45,81 @@ interface AiChatInterfaceProps {
   onRoleSwitch?: () => void;
 }
 
-export function AiChatInterface({ 
-  onConnectWithLawyer, 
-  onRoleSwitch 
+export function AiChatInterface({
+  onConnectWithLawyer,
+  onRoleSwitch,
 }: AiChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const { user } = useAuth();
 
-  const handleSendMessage = (messageText?: string) => {
+  const handleSendMessage = async (messageText?: string) => {
     const text = messageText || inputValue;
     if (!text.trim()) return;
 
+    // const userMessage = {
+    //   id: Date.now().toString(),
+    //   role: 'user',
+    //   content: text
+    // };
     const userMessage: Message = {
       id: Date.now().toString(),
-      role: 'user',
-      content: text
+      role: "user",
+      content: text,
     };
 
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
+    setMessages((prev) => [...prev, userMessage]);
+    setInputValue("");
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      const res = await fetch("http://localhost:5000/api/rag/ask", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question: text }),
+      });
+
+      const data = await res.json();
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: generateAIResponse(text),
-        references: [
-          {
-            title: 'Smith v. Landlord Properties',
-            citation: '234 F.2d 567 (2023)'
-          },
-          {
-            title: 'Tenant Rights Act § 123',
-            citation: 'State Code § 123.45'
-          }
-        ]
+        role: "assistant",
+        content: data.answer,
+        references: data.sources?.map((s: any) => ({
+          title: s.section_title || "Legal Section",
+          citation: `Section ${s.section_number}`,
+        })),
       };
-      setMessages(prev => [...prev, aiMessage]);
-      setIsTyping(false);
-    }, 1500);
+
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      console.error(error);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: "⚠️ Error connecting to AI service",
+        },
+      ]);
+    }
+
+    setIsTyping(false);
   };
 
-  const generateAIResponse = (question: string): string => {
-    if (question.toLowerCase().includes('tenant') || question.toLowerCase().includes('rent')) {
-      return 'As a tenant, you have several important rights:\n\n1. **Right to Habitable Housing**: Your landlord must maintain the property in a safe and livable condition.\n\n2. **Right to Privacy**: Your landlord must provide proper notice (usually 24-48 hours) before entering your rental unit.\n\n3. **Right to Fair Treatment**: You\'re protected against discrimination based on race, religion, national origin, disability, or family status.\n\n4. **Security Deposit Rights**: Your landlord must return your security deposit (minus legitimate deductions) within a specific timeframe after you move out.\n\n5. **Right to Withhold Rent**: In some cases, if your landlord fails to make necessary repairs, you may have the right to withhold rent or make repairs and deduct the cost.\n\nThese rights vary by state, so I recommend consulting with a local attorney for specific guidance about your situation.';
-    }
-    return 'I understand your question. Based on current legal standards, here\'s what you need to know:\n\nThe law in this area has been established through several important court decisions and statutes. Generally speaking, you have certain rights and responsibilities that are protected under law.\n\nI\'ve found some relevant cases and legal references that might help. Would you like me to connect you with a qualified attorney who can provide more specific advice for your situation?';
-  };
+  // const generateAIResponse = (question: string): string => {
+  //   if (
+  //     question.toLowerCase().includes("tenant") ||
+  //     question.toLowerCase().includes("rent")
+  //   ) {
+  //     return "As a tenant, you have several important rights:\n\n1. **Right to Habitable Housing**: Your landlord must maintain the property in a safe and livable condition.\n\n2. **Right to Privacy**: Your landlord must provide proper notice (usually 24-48 hours) before entering your rental unit.\n\n3. **Right to Fair Treatment**: You're protected against discrimination based on race, religion, national origin, disability, or family status.\n\n4. **Security Deposit Rights**: Your landlord must return your security deposit (minus legitimate deductions) within a specific timeframe after you move out.\n\n5. **Right to Withhold Rent**: In some cases, if your landlord fails to make necessary repairs, you may have the right to withhold rent or make repairs and deduct the cost.\n\nThese rights vary by state, so I recommend consulting with a local attorney for specific guidance about your situation.";
+  //   }
+  //   return "I understand your question. Based on current legal standards, here's what you need to know:\n\nThe law in this area has been established through several important court decisions and statutes. Generally speaking, you have certain rights and responsibilities that are protected under law.\n\nI've found some relevant cases and legal references that might help. Would you like me to connect you with a qualified attorney who can provide more specific advice for your situation?";
+  // };
 
   return (
     <div className="grid lg:grid-cols-3 gap-6">
@@ -100,39 +133,47 @@ export function AiChatInterface({
               </div>
               <div className="flex-1">
                 <CardTitle className="text-white">AI Legal Assistant</CardTitle>
-                <p className="text-sm text-white/80">Ask your legal questions in simple language</p>
+                <p className="text-sm text-white/80">
+                  Ask your legal questions in simple language
+                </p>
               </div>
-              <Badge className="bg-white/20 text-white border-white/30">{user?.role} View</Badge>
+              <Badge className="bg-white/20 text-white border-white/30">
+                {user?.role} View
+              </Badge>
             </div>
           </CardHeader>
-          
+
           <CardContent className="p-0 flex flex-col h-[calc(100%-5rem)]">
             <ScrollArea className="flex-1 p-6">
               <div className="space-y-4">
                 {messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}
                   >
-                    {message.role === 'assistant' && (
+                    {message.role === "assistant" && (
                       <Avatar className="h-8 w-8 flex-shrink-0">
                         <AvatarFallback className="bg-[#1E3A8A] text-white">
                           <Bot className="h-4 w-4" />
                         </AvatarFallback>
                       </Avatar>
                     )}
-                    
-                    <div className={`max-w-[80%] ${message.role === 'user' ? 'order-1' : ''}`}>
+
+                    <div
+                      className={`max-w-[80%] ${message.role === "user" ? "order-1" : ""}`}
+                    >
                       <div
                         className={`rounded-lg p-4 ${
-                          message.role === 'user'
-                            ? 'bg-[#1E3A8A] text-white'
-                            : 'bg-gray-100 text-gray-800'
+                          message.role === "user"
+                            ? "bg-[#1E3A8A] text-white"
+                            : "bg-gray-100 text-gray-800"
                         }`}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <p className="text-sm whitespace-pre-wrap">
+                          {message.content}
+                        </p>
                       </div>
-                      
+
                       {message.references && (
                         <div className="mt-2 space-y-2">
                           <p className="text-xs text-gray-500 flex items-center gap-1">
@@ -140,18 +181,23 @@ export function AiChatInterface({
                             Legal References:
                           </p>
                           {message.references.map((ref, idx) => (
-                            <Card key={idx} className="border-l-4 border-l-[#D4AF37]">
+                            <Card
+                              key={idx}
+                              className="border-l-4 border-l-[#D4AF37]"
+                            >
                               <CardContent className="p-3">
                                 <p className="text-sm">{ref.title}</p>
-                                <p className="text-xs text-gray-500">{ref.citation}</p>
+                                <p className="text-xs text-gray-500">
+                                  {ref.citation}
+                                </p>
                               </CardContent>
                             </Card>
                           ))}
                         </div>
                       )}
                     </div>
-                    
-                    {message.role === 'user' && (
+
+                    {message.role === "user" && (
                       <Avatar className="h-8 w-8 flex-shrink-0">
                         <AvatarFallback className="bg-[#D4AF37] text-white">
                           <User className="h-4 w-4" />
@@ -160,7 +206,7 @@ export function AiChatInterface({
                     )}
                   </div>
                 ))}
-                
+
                 {isTyping && (
                   <div className="flex gap-3">
                     <Avatar className="h-8 w-8 flex-shrink-0">
@@ -179,17 +225,17 @@ export function AiChatInterface({
                 )}
               </div>
             </ScrollArea>
-            
+
             <div className="p-4 border-t bg-white">
               <div className="flex gap-2">
                 <Input
                   placeholder="Ask your legal question in simple language..."
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                  onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
                   className="flex-1"
                 />
-                <Button 
+                <Button
                   onClick={() => handleSendMessage()}
                   className="bg-[#1E3A8A] hover:bg-[#1E3A8A]/90"
                 >
@@ -227,16 +273,17 @@ export function AiChatInterface({
         </Card>
 
         {/* Help Card */}
-        {user?.role === 'Client' && (
+        {user?.role === "Client" && (
           <Card className="border-2 border-[#D4AF37]/20 bg-[#D4AF37]/5">
             <CardHeader>
               <CardTitle className="text-[#1E293B]">Need a Lawyer?</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-gray-600">
-                While I can provide general legal information, consulting with a qualified attorney is recommended for specific legal advice.
+                While I can provide general legal information, consulting with a
+                qualified attorney is recommended for specific legal advice.
               </p>
-              <Button 
+              <Button
                 className="w-full bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-white"
                 onClick={onConnectWithLawyer}
               >

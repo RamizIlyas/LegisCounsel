@@ -10,10 +10,12 @@ connectDB();
 
 app.use(cors());
 app.use(express.json());
+const ragRoutes = require("./routes/ragRoutes");
+
 
 // Routes
 app.use("/api/auth", authRoutes);
-
+app.use("/api/rag", ragRoutes);
 app.listen(5000, () => {
   console.log("Server running on port 5000");
 });
