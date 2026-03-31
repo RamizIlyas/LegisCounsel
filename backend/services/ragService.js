@@ -1,8 +1,9 @@
-const axios = require("axios");
+// const axios = require("axios");
+import axios from "axios";
 
 const RAG_API = "http://localhost:8001/ask";
 
-async function askRAG(question) {
+export const askRAG = async (question) => {
   try {
     const response = await axios.post(RAG_API, {
       question,
@@ -15,4 +16,4 @@ async function askRAG(question) {
   }
 }
 
-module.exports = { askRAG };
+// module.exports = { askRAG };

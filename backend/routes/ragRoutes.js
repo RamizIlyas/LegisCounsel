@@ -1,6 +1,7 @@
-const express = require("express");
+import express from "express";
 const router = express.Router();
-const { askRAG } = require("../services/ragService");
+// const {  } = require("../services/ragService");
+import { askRAG} from "../services/ragService.js";
 
 router.post("/ask", async (req, res) => {
   try {
@@ -14,4 +15,5 @@ router.post("/ask", async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
+// module.exports = router;

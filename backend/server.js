@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
+import ragRoutes from "./routes/ragRoutes.js";
 
 const app = express();
 
@@ -10,7 +11,7 @@ connectDB();
 
 app.use(cors());
 app.use(express.json());
-const ragRoutes = require("./routes/ragRoutes");
+// const ragRoutes = require("./routes/ragRoutes");
 
 
 // Routes

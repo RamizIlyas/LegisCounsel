@@ -12,12 +12,12 @@ def adjust_score(judgment_text):
         return 0
 
     if "Faithful: No" in judgment_text:
-        score -= 30
+        score -= 15 # 30(Strict) ,15 if you want to be more lenient
 
     if "Correct: No" in judgment_text:
-        score -= 30
+        score -= 20 #30(Strict) , 20 if you want to be more lenient
     elif "Correct: Partial" in judgment_text:
-        score -= 10
+        score -= 10 # 10(Strict) , 5 if you want to be more lenient
 
     return max(score, 0)
 

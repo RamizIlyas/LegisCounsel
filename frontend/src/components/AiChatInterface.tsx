@@ -107,8 +107,9 @@ export function AiChatInterface({
         },
       ]);
     }
-
-    setIsTyping(false);
+    finally {
+      setIsTyping(false);
+    }
   };
 
   // const generateAIResponse = (question: string): string => {
