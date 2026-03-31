@@ -79,7 +79,14 @@ export function AiChatInterface({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ question: text }),
+        body: JSON.stringify({ 
+          question: text,
+          // Include conversation history for better context in follow-up questions
+          history:messages.map((m)=>({
+            role: m.role,
+            content: m.content
+          }))
+        }),
       });
 
       const data = await res.json();

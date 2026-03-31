@@ -5,9 +5,9 @@ import { askRAG} from "../services/ragService.js";
 
 router.post("/ask", async (req, res) => {
   try {
-    const { question } = req.body;
+    const { question, history } = req.body;
 
-    const result = await askRAG(question);
+    const result = await askRAG(question, history);
 
     res.json(result);
   } catch (err) {

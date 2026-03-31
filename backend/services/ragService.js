@@ -3,10 +3,11 @@ import axios from "axios";
 
 const RAG_API = "http://localhost:8001/ask";
 
-export const askRAG = async (question) => {
+export const askRAG = async (question, history) => {
   try {
     const response = await axios.post(RAG_API, {
       question,
+      history
     });
 
     return response.data;

@@ -7,11 +7,12 @@ rag = LocalRAG()
 
 class Query(BaseModel):
     question: str
+    history: list = []  # Optional conversation history for follow-up questions
 
 @app.post("/ask")
 def ask(query: Query):
     docs, metas = rag.retrieve(query.question)
-    answer = rag.ask(query.question, docs, metas)
+    answer = rag.ask(query.question, docs, metas, query.history)
 
     return {
         "answer": answer,
