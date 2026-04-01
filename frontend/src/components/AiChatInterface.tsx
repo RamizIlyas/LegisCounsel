@@ -176,7 +176,7 @@ export function AiChatInterface({
     <div className="grid lg:grid-cols-3 gap-6">
       {/* Main Chat Area */}
       <div className="lg:col-span-2">
-        <Card className="h-[calc(100vh-12rem)]">
+        <Card className="h-[calc(100vh-12rem)] overflow-y-auto">
           <div className="flex h-full">
             {/* LEFT: Conversations Sidebar */}
             <div className="w-64 border-r bg-[#F8FAFC] flex flex-col">
@@ -191,19 +191,19 @@ export function AiChatInterface({
 
               <ScrollArea className="flex-1 px-2">
                 {Array.isArray(conversations) &&
-                conversations.map((chat) => (
-                  <div
-                    key={chat._id}
-                    onClick={() => loadMessages(chat._id)}
-                    className={`p-2 rounded cursor-pointer mb-2 text-sm ${
-                      conversationId === chat._id
-                        ? "bg-[#1E3A8A] text-white"
-                        : "hover:bg-gray-200"
-                    }`}
-                  >
-                    <p className="truncate">{chat.title || "New Chat"}</p>
-                  </div>
-                ))}
+                  conversations.map((chat) => (
+                    <div
+                      key={chat._id}
+                      onClick={() => loadMessages(chat._id)}
+                      className={`p-2 rounded cursor-pointer mb-2 text-sm ${
+                        conversationId === chat._id
+                          ? "bg-[#1E3A8A] text-white"
+                          : "hover:bg-gray-200"
+                      }`}
+                    >
+                      <p className="truncate">{chat.title || "New Chat"}</p>
+                    </div>
+                  ))}
               </ScrollArea>
             </div>
 
@@ -274,13 +274,17 @@ export function AiChatInterface({
 
                     {isTyping && (
                       <div className="flex gap-3">
-                        <Avatar className="h-8 w-8">
+                        <Avatar className="h-8 w-8 flex-shrink-0">
                           <AvatarFallback className="bg-[#1E3A8A] text-white">
                             <Bot className="h-4 w-4" />
                           </AvatarFallback>
                         </Avatar>
                         <div className="bg-gray-100 rounded-lg p-4">
-                          typing...
+                          <div className="flex gap-1">
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+                          </div>
                         </div>
                       </div>
                     )}

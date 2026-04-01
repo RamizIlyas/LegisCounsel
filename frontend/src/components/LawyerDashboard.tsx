@@ -11,6 +11,7 @@ import { Search, Filter, FileText, Download, ExternalLink, TrendingUp, Scale, Ca
 import type { Page, UserRole } from '../App';
 import { ClientDashboard } from './ClientDashboard';
 import { AiChatInterface } from './AiChatInterface';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LawyerDashboardProps {
   onNavigate: (page: Page) => void;
@@ -81,7 +82,7 @@ export function LawyerDashboard({ onNavigate, onLogout, onRoleSwitch }: LawyerDa
   const [jurisdictionFilter, setJurisdictionFilter] = useState('all');
   const [relevanceFilter, setRelevanceFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
-
+  const {user} = useAuth();
   const searchBar = (
     <div className="flex-1 max-w-2xl">
       <div className="relative">
@@ -109,14 +110,14 @@ export function LawyerDashboard({ onNavigate, onLogout, onRoleSwitch }: LawyerDa
         {/* Welcome Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-[#1E293B] mb-2">Welcome back, John</h1>
+            <h1 className="text-[#1E293B] mb-2">Welcome back, {user?.name ? user?.name : "Guest"}</h1>
             <p className="text-gray-600">Find the perfect legal precedent with AI-powered search</p>
           </div>
           <Badge className="bg-[#1E3A8A] text-white">Lawyer View</Badge>
         </div>
         
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Recent Searches</CardDescription>
@@ -153,7 +154,7 @@ export function LawyerDashboard({ onNavigate, onLogout, onRoleSwitch }: LawyerDa
               <p className="text-xs text-gray-500">High accuracy rate</p>
             </CardContent>
           </Card>
-        </div>
+        </div> */}
         <AiChatInterface/>
         {/* Search and Filters */}
         <Card>
