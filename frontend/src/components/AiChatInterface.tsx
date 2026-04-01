@@ -1,5 +1,5 @@
 // AiChatInterface.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -10,7 +10,7 @@ import {
   Send,
   Bot,
   User,
-  FileText,
+  // FileText,
   Scale,
   MessageCircle,
   Sparkles,
@@ -49,9 +49,12 @@ export function AiChatInterface({
   onConnectWithLawyer,
   onRoleSwitch,
 }: AiChatInterfaceProps) {
+  // All The States
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<any[]>([]);
   const { user } = useAuth();
 
   const handleSendMessage = async (messageText?: string) => {
@@ -79,13 +82,15 @@ export function AiChatInterface({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           question: text,
-          // Include conversation history for better context in follow-up questions
-          history:messages.map((m)=>({
-            role: m.role,
-            content: m.content
-          }))
+          conversation_id: conversationId,
+          // question: text,
+          // // Include conversation history for better context in follow-up questions
+          // history:messages.map((m)=>({
+          //   role: m.role,
+          //   content: m.content
+          // }))
         }),
       });
 
@@ -113,11 +118,49 @@ export function AiChatInterface({
           content: "⚠️ Error connecting to AI service",
         },
       ]);
-    }
-    finally {
+    } finally {
       setIsTyping(false);
     }
   };
+  // Load conversations
+  const loadConversations = async () => {
+    const res = await fetch("http://localhost:5000/api/rag/conversations");
+    const data = await res.json();
+    setConversations(data);
+  };
+  // Create new conversation when component mounts
+  //  if no conversation exists
+  const createNewChat = async () => {
+    const res = await fetch("http://localhost:5000/api/rag/conversation", {
+      method: "POST",
+    });
+
+    const data = await res.json();
+
+    setConversationId(data.conversation_id);
+    setMessages(initialMessages);
+
+    loadConversations();
+  };
+  // Load messages when clicking chat from sidebar
+  const loadMessages = async (id: string) => {
+    const res = await fetch(`http://localhost:5000/api/rag/messages/${id}`);
+
+    const data = await res.json();
+
+    const formatted = data.map((m: any) => ({
+      id: Math.random().toString(),
+      role: m.role,
+      content: m.content,
+    }));
+
+    setConversationId(id);
+    setMessages(formatted);
+  };
+  useEffect(() => {
+    loadConversations();
+    createNewChat();
+  }, []);
 
   // const generateAIResponse = (question: string): string => {
   //   if (
@@ -133,125 +176,139 @@ export function AiChatInterface({
     <div className="grid lg:grid-cols-3 gap-6">
       {/* Main Chat Area */}
       <div className="lg:col-span-2">
-        <Card className="h-[calc(100vh-12rem)] overflow-y-auto">
-          <CardHeader className="border-b bg-gradient-to-r from-[#1E3A8A] to-[#1E3A8A]/80">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center">
-                <Bot className="h-6 w-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <CardTitle className="text-white">AI Legal Assistant</CardTitle>
-                <p className="text-sm text-white/80">
-                  Ask your legal questions in simple language
-                </p>
-              </div>
-              <Badge className="bg-white/20 text-white border-white/30">
-                {user?.role} View
-              </Badge>
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-0 flex flex-col h-[calc(100%-5rem)]">
-            <ScrollArea className="flex-1 p-6">
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    {message.role === "assistant" && (
-                      <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarFallback className="bg-[#1E3A8A] text-white">
-                          <Bot className="h-4 w-4" />
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-
-                    <div
-                      className={`max-w-[80%] ${message.role === "user" ? "order-1" : ""}`}
-                    >
-                      <div
-                        className={`rounded-lg p-4 ${
-                          message.role === "user"
-                            ? "bg-[#1E3A8A] text-white"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap">
-                          {message.content}
-                        </p>
-                      </div>
-
-                      {message.references && (
-                        <div className="mt-2 space-y-2">
-                          <p className="text-xs text-gray-500 flex items-center gap-1">
-                            <FileText className="h-3 w-3" />
-                            Legal References:
-                          </p>
-                          {message.references.map((ref, idx) => (
-                            <Card
-                              key={idx}
-                              className="border-l-4 border-l-[#D4AF37]"
-                            >
-                              <CardContent className="p-3">
-                                <p className="text-sm">{ref.title}</p>
-                                <p className="text-xs text-gray-500">
-                                  {ref.citation}
-                                </p>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {message.role === "user" && (
-                      <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarFallback className="bg-[#D4AF37] text-white">
-                          <User className="h-4 w-4" />
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-                  </div>
-                ))}
-
-                {isTyping && (
-                  <div className="flex gap-3">
-                    <Avatar className="h-8 w-8 flex-shrink-0">
-                      <AvatarFallback className="bg-[#1E3A8A] text-white">
-                        <Bot className="h-4 w-4" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="bg-gray-100 rounded-lg p-4">
-                      <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-
-            <div className="p-4 border-t bg-white">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Ask your legal question in simple language..."
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-                  className="flex-1"
-                />
+        <Card className="h-[calc(100vh-12rem)]">
+          <div className="flex h-full">
+            {/* LEFT: Conversations Sidebar */}
+            <div className="w-64 border-r bg-[#F8FAFC] flex flex-col">
+              <div className="p-3">
                 <Button
-                  onClick={() => handleSendMessage()}
-                  className="bg-[#1E3A8A] hover:bg-[#1E3A8A]/90"
+                  className="w-full bg-[#1E3A8A] text-white"
+                  onClick={createNewChat}
                 >
-                  <Send className="h-4 w-4" />
+                  + New Chat
                 </Button>
               </div>
+
+              <ScrollArea className="flex-1 px-2">
+                {Array.isArray(conversations) &&
+                conversations.map((chat) => (
+                  <div
+                    key={chat._id}
+                    onClick={() => loadMessages(chat._id)}
+                    className={`p-2 rounded cursor-pointer mb-2 text-sm ${
+                      conversationId === chat._id
+                        ? "bg-[#1E3A8A] text-white"
+                        : "hover:bg-gray-200"
+                    }`}
+                  >
+                    <p className="truncate">{chat.title || "New Chat"}</p>
+                  </div>
+                ))}
+              </ScrollArea>
             </div>
-          </CardContent>
+
+            {/* RIGHT: Chat Area */}
+            <div className="flex-1 flex flex-col">
+              {/* HEADER */}
+              <CardHeader className="border-b bg-gradient-to-r from-[#1E3A8A] to-[#1E3A8A]/80">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center">
+                    <Bot className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-white">
+                      AI Legal Assistant
+                    </CardTitle>
+                    <p className="text-sm text-white/80">
+                      Ask your legal questions in simple language
+                    </p>
+                  </div>
+                  <Badge className="bg-white/20 text-white border-white/30">
+                    {user?.role} View
+                  </Badge>
+                </div>
+              </CardHeader>
+
+              {/* CHAT CONTENT */}
+              <CardContent className="flex-1 p-0 flex flex-col">
+                <ScrollArea className="flex-1 p-6">
+                  <div className="space-y-4">
+                    {messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`flex gap-3 ${
+                          message.role === "user"
+                            ? "justify-end"
+                            : "justify-start"
+                        }`}
+                      >
+                        {message.role === "assistant" && (
+                          <Avatar className="h-8 w-8 flex-shrink-0">
+                            <AvatarFallback className="bg-[#1E3A8A] text-white">
+                              <Bot className="h-4 w-4" />
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+
+                        <div className="max-w-[80%]">
+                          <div
+                            className={`rounded-lg p-4 ${
+                              message.role === "user"
+                                ? "bg-[#1E3A8A] text-white"
+                                : "bg-gray-100"
+                            }`}
+                          >
+                            {message.content}
+                          </div>
+                        </div>
+
+                        {message.role === "user" && (
+                          <Avatar className="h-8 w-8 flex-shrink-0">
+                            <AvatarFallback className="bg-[#D4AF37] text-white">
+                              <User className="h-4 w-4" />
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                      </div>
+                    ))}
+
+                    {isTyping && (
+                      <div className="flex gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="bg-[#1E3A8A] text-white">
+                            <Bot className="h-4 w-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="bg-gray-100 rounded-lg p-4">
+                          typing...
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+
+                {/* INPUT */}
+                <div className="p-4 border-t bg-white">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Ask your legal question..."
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyPress={(e) =>
+                        e.key === "Enter" && handleSendMessage()
+                      }
+                    />
+                    <Button
+                      onClick={() => handleSendMessage()}
+                      className="bg-[#1E3A8A]"
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </div>
+          </div>
         </Card>
       </div>
 

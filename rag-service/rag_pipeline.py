@@ -37,8 +37,8 @@ class LocalRAG:
 
         # Ollama endpoint
         self.ollama_url = "http://localhost:11434/api/generate"
-        self.model = "llama3.2:3b"   # llama3 or mistral(Fast)
-        self.judge_model = "llama3.2:3b"  # For evaluation (Llama 3 is better at scoring as it is strict)
+        self.model = "qwen2.5:3b"   # llama3 or mistral(Fast)
+        # self.judge_model = "llama3.2:3b"  # For evaluation (Llama 3 is better at scoring as it is strict)
 
         # Warm up the model with a dummy request to reduce latency on first real query
         print("🔥 Warming up model...")
@@ -79,8 +79,8 @@ class LocalRAG:
 
         prompt = f"""You are a legal assistant for Pakistan Penal Code.
 
-                    Use ONLY the context below and Conversation History (More Important) to answer the question.
-                    If the answer is not clearly in the context, say "Not found in provided context."
+                    Use ONLY the Conversation History and context below to answer the question.
+                    If the answer is not clearly in the context or conversation history, say "Not found in provided context."
                     Do NOT guess or introduce unrelated sections.
                     
                     Conversation History:
@@ -203,7 +203,7 @@ class LocalRAG:
         response = requests.post(
             self.ollama_url,
             json={
-                "model": self.judge_model,  # use llama3 (better reasoning)
+                "model": self.model, 
                 "prompt": prompt,
                 "stream": False
             }
