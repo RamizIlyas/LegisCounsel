@@ -10,7 +10,7 @@ import {
   Send,
   Bot,
   User,
-  // FileText,
+  FileText,
   Scale,
   MessageCircle,
   Sparkles,
@@ -56,11 +56,15 @@ export function AiChatInterface({
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
   const { user } = useAuth();
+  useEffect(() => {
+    loadConversations(); // Load conversations when component mounts
+  }, []);
 
   const handleSendMessage = async (messageText?: string) => {
     const text = messageText || inputValue;
     if (!text.trim()) return;
 
+    const currentConversationId = await ensureConversation(); // ✅ clean
     // const userMessage = {
     //   id: Date.now().toString(),
     //   role: 'user',
@@ -84,7 +88,7 @@ export function AiChatInterface({
         },
         body: JSON.stringify({
           question: text,
-          conversation_id: conversationId,
+          conversation_id: currentConversationId,
           // question: text,
           // // Include conversation history for better context in follow-up questions
           // history:messages.map((m)=>({
@@ -122,6 +126,25 @@ export function AiChatInterface({
       setIsTyping(false);
     }
   };
+
+  // Helper Function that Ensure conversation exists (create if not) and return ID
+  const ensureConversation = async (): Promise<string> => {
+    // If already exists → just return it
+    if (conversationId) return conversationId;
+    // prevent race condition
+    if (isTyping) return conversationId!;
+    // Otherwise create a new one
+    const res = await fetch("http://localhost:5000/api/rag/conversation", {
+      method: "POST",
+    });
+
+    const data = await res.json();
+
+    setConversationId(data.conversation_id);
+    loadConversations();
+
+    return data.conversation_id;
+  };
   // Load conversations
   const loadConversations = async () => {
     const res = await fetch("http://localhost:5000/api/rag/conversations");
@@ -157,10 +180,6 @@ export function AiChatInterface({
     setConversationId(id);
     setMessages(formatted);
   };
-  useEffect(() => {
-    loadConversations();
-    createNewChat();
-  }, []);
 
   // const generateAIResponse = (question: string): string => {
   //   if (
@@ -173,9 +192,9 @@ export function AiChatInterface({
   // };
 
   return (
-    <div className="grid lg:grid-cols-3 gap-6">
+    <div className="grid lg:grid-cols-1 gap-6">
       {/* Main Chat Area */}
-      <div className="lg:col-span-2">
+      <div className="col-span-1">
         <Card className="h-[calc(100vh-12rem)] overflow-y-auto">
           <div className="flex h-full">
             {/* LEFT: Conversations Sidebar */}
@@ -258,8 +277,31 @@ export function AiChatInterface({
                                 : "bg-gray-100"
                             }`}
                           >
-                            {message.content}
+                            <p className="text-sm whitespace-pre-wrap">
+                              {message.content}
+                            </p>
                           </div>
+                          {message.references && (
+                            <div className="mt-2 space-y-2">
+                              <p className="text-xs text-gray-500 flex items-center gap-1">
+                                <FileText className="h-3 w-3" />
+                                Legal References:
+                              </p>
+                              {message.references.map((ref, idx) => (
+                                <Card
+                                  key={idx}
+                                  className="border-l-4 border-l-[#D4AF37]"
+                                >
+                                  <CardContent className="p-3">
+                                    <p className="text-sm">{ref.title}</p>
+                                    <p className="text-xs text-gray-500">
+                                      {ref.citation}
+                                    </p>
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         {message.role === "user" && (
@@ -315,9 +357,8 @@ export function AiChatInterface({
           </div>
         </Card>
       </div>
-
-      {/* Sidebar */}
-      <div className="space-y-6">
+            {/* Sidebar */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
         {/* Quick Questions */}
         <Card>
           <CardHeader>
