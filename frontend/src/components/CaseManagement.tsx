@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState,useEffect } from 'react';
+import axios from 'axios';
 import { DashboardLayout } from './DashboardLayout';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -39,7 +40,7 @@ interface CaseManagementProps {
 }
 
 interface Case {
-  id: string;
+  _id: string;
   name: string;
   client: string;
   status: 'active' | 'pending' | 'closed';
@@ -48,82 +49,134 @@ interface Case {
   caseType: string;
 }
 
-const mockCases: Case[] = [
-  {
-    id: '1',
-    name: 'Smith v. Johnson Corp.',
-    client: 'Michael Smith',
-    status: 'active',
-    nextHearing: '2025-11-15',
-    filedDate: '2025-01-10',
-    caseType: 'Employment Law'
-  },
-  {
-    id: '2',
-    name: 'Estate of Williams',
-    client: 'Sarah Williams',
-    status: 'pending',
-    nextHearing: '2025-11-20',
-    filedDate: '2025-02-14',
-    caseType: 'Estate Planning'
-  },
-  {
-    id: '3',
-    name: 'Martinez v. City Council',
-    client: 'Carlos Martinez',
-    status: 'active',
-    nextHearing: '2025-11-08',
-    filedDate: '2024-12-05',
-    caseType: 'Civil Rights'
-  },
-  {
-    id: '4',
-    name: 'Thompson Real Estate Dispute',
-    client: 'Jennifer Thompson',
-    status: 'closed',
-    nextHearing: '2025-09-30',
-    filedDate: '2024-11-20',
-    caseType: 'Property Law'
-  }
-];
+// const mockCases: Case[] = [
+//   {
+//     id: '1',
+//     name: 'Smith v. Johnson Corp.',
+//     client: 'Michael Smith',
+//     status: 'active',
+//     nextHearing: '2025-11-15',
+//     filedDate: '2025-01-10',
+//     caseType: 'Employment Law'
+//   },
+//   {
+//     id: '2',
+//     name: 'Estate of Williams',
+//     client: 'Sarah Williams',
+//     status: 'pending',
+//     nextHearing: '2025-11-20',
+//     filedDate: '2025-02-14',
+//     caseType: 'Estate Planning'
+//   },
+//   {
+//     id: '3',
+//     name: 'Martinez v. City Council',
+//     client: 'Carlos Martinez',
+//     status: 'active',
+//     nextHearing: '2025-11-08',
+//     filedDate: '2024-12-05',
+//     caseType: 'Civil Rights'
+//   },
+//   {
+//     id: '4',
+//     name: 'Thompson Real Estate Dispute',
+//     client: 'Jennifer Thompson',
+//     status: 'closed',
+//     nextHearing: '2025-09-30',
+//     filedDate: '2024-11-20',
+//     caseType: 'Property Law'
+//   }
+// ];
 
 export function CaseManagement({ userRole, onNavigate, onLogout }: CaseManagementProps) {
-  const [cases, setCases] = useState<Case[]>(mockCases);
+  const [cases, setCases] = useState<Case[]>([]);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
 
+  useEffect(() => {
+  fetchCases();
+}, []);
+
+const fetchCases = async () => {
+  try {
+    const token = localStorage.getItem("token");
+    const res = await axios.get("http://localhost:5000/api/cases", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    setCases(res.data);
+  } catch (err) {
+    toast("Error fetching cases");
+  }
+}; 
+
   const [newCase, setNewCase] = useState({
     name: '',
     client: '',
+    // clientEmail: '',
     caseType: '',
     nextHearing: ''
   });
 
-  const handleAddCase = () => {
+  const handleAddCase = async () => {
     if (newCase.name && newCase.client && newCase.caseType) {
-      const caseToAdd: Case = {
-        id: Date.now().toString(),
-        name: newCase.name,
-        client: newCase.client,
-        status: 'active',
-        nextHearing: newCase.nextHearing || '2025-12-01',
-        filedDate: new Date().toISOString().split('T')[0],
-        caseType: newCase.caseType
-      };
-      setCases([...cases, caseToAdd]);
+      try {
+      const token = localStorage.getItem("token");
+      const res = await axios.post(
+        "http://localhost:5000/api/cases", 
+        newCase,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      setCases([...cases, res.data]);
       setShowAddDialog(false);
-      setNewCase({ name: '', client: '', caseType: '', nextHearing: '' });
-      toast('Case added successfully');
+      setNewCase({ name: "", client: "", caseType: "", nextHearing: "" });
+
+      toast("Case added successfully");
+    } catch (err) {
+      toast("Error adding case");
+    }
+      // const caseToAdd: Case = {
+      //   id: Date.now().toString(),
+      //   name: newCase.name,
+      //   client: newCase.client,
+      //   status: 'active',
+      //   nextHearing: newCase.nextHearing || '2025-12-01',
+      //   filedDate: new Date().toISOString().split('T')[0],
+      //   caseType: newCase.caseType
+      // };
+      // setCases([...cases, caseToAdd]);
+      // setShowAddDialog(false);
+      // setNewCase({ name: '', client: '', caseType: '', nextHearing: '' });
+      // toast('Case added successfully');
     } else {
       toast('Please fill in all required fields');
     }
   };
 
-  const handleDeleteCase = (id: string) => {
-    setCases(cases.filter(c => c.id !== id));
-    toast('Case deleted');
+  const handleDeleteCase = async (id: string) => {
+    try {
+    const token = localStorage.getItem("token");
+    console.log("Token for deletion:", token);
+    await axios.delete(`http://localhost:5000/api/cases/${id}`
+      , {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+    );
+    setCases(cases.filter(c => c._id !== id));
+    toast("Case deleted");
+  } catch (err) {
+    toast("Error deleting case");
+  }
   };
 
   const getStatusIcon = (status: Case['status']) => {
@@ -258,7 +311,7 @@ export function CaseManagement({ userRole, onNavigate, onLogout }: CaseManagemen
                       </TableHeader>
                       <TableBody>
                         {filteredCases.map((caseItem) => (
-                          <TableRow key={caseItem.id}>
+                          <TableRow key={caseItem._id}>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <FileText className="h-4 w-4 text-[#1E3A8A]" />
@@ -288,7 +341,7 @@ export function CaseManagement({ userRole, onNavigate, onLogout }: CaseManagemen
                                   </DropdownMenuItem>
                                   <DropdownMenuItem 
                                     className="text-red-600"
-                                    onClick={() => handleDeleteCase(caseItem.id)}
+                                    onClick={() => handleDeleteCase(caseItem._id)}
                                   >
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete
@@ -304,7 +357,7 @@ export function CaseManagement({ userRole, onNavigate, onLogout }: CaseManagemen
                 ) : (
                   <div className="space-y-3">
                     {filteredCases.map((caseItem) => (
-                      <Card key={caseItem.id} className="border-l-4 border-l-[#1E3A8A]">
+                      <Card key={caseItem._id} className="border-l-4 border-l-[#1E3A8A]">
                         <CardContent className="p-4">
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
@@ -334,7 +387,7 @@ export function CaseManagement({ userRole, onNavigate, onLogout }: CaseManagemen
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 
                                   className="text-red-600"
-                                  onClick={() => handleDeleteCase(caseItem.id)}
+                                  onClick={() => handleDeleteCase(caseItem._id)}
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
                                   Delete
@@ -378,7 +431,7 @@ export function CaseManagement({ userRole, onNavigate, onLogout }: CaseManagemen
               </CardHeader>
               <CardContent className="space-y-3">
                 {upcomingHearings.map((caseItem) => (
-                  <div key={caseItem.id} className="p-3 bg-gray-50 rounded-lg">
+                  <div key={caseItem._id} className="p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-start gap-2">
                       <CalendarIcon className="h-4 w-4 text-[#1E3A8A] mt-0.5" />
                       <div className="flex-1 min-w-0">

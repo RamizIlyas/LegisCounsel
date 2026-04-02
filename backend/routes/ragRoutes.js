@@ -8,7 +8,7 @@ import Conversation from "../models/conversation.js";
 import { protect } from "../controllers/authMiddleware.js";
 
 // Create Conversation Route
-router.post("/Conversation", protect, async (req, res) => {
+router.post("/conversation", protect, async (req, res) => {
   try {
     const user_id = req.user.id; // Get user ID from protected middleware
 
@@ -27,8 +27,46 @@ router.post("/Conversation", protect, async (req, res) => {
     res.status(500).json({ error: "Failed to create Conversation" });
   }
 });
+
+// Rename Conversation
+router.put("/conversation/:id", protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+
+    console.log("Renaming", id, "to", title);
+
+    const updated = await Conversation.findOneAndUpdate(
+      { _id: id },
+      { title, updated_at: new Date() },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to rename conversation" });
+  }
+});
+// Delete Conversation
+router.delete("/conversation/:id", protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await Conversation.deleteOne({ _id: id });
+    await Message.deleteMany({ conversation_id: id }); // cleanup messages
+
+    res.json({ message: "Conversation deleted" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete conversation" });
+  }
+});
 // Get All Conversations for a user
-router.get("/Conversations", protect, async (req, res) => {
+router.get("/conversations", protect, async (req, res) => {
   try {
     const user_id = req.user.id;
 

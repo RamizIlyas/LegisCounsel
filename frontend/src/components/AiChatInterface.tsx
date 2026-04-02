@@ -1,5 +1,5 @@
 // AiChatInterface.tsx
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -67,7 +67,24 @@ export function AiChatInterface({
   const [isTyping, setIsTyping] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [editingChatId, setEditingChatId] = useState<string | null>(null);
+  const [newTitle, setNewTitle] = useState("");
   const { user } = useAuth();
+  // const menuRef = useRef<HTMLDivElement | null>(null);
+  // Close 3-dot menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setActiveMenu(null);
+    };
+
+    document.addEventListener("click", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
   useEffect(() => {
     loadConversations(); // Load conversations when component mounts
   }, []);
@@ -160,17 +177,9 @@ export function AiChatInterface({
   // Create new conversation
   //  if no conversation exists
   const createNewChat = async () => {
-    ////Commenting it so it doesnot create new chat at backend 
-    //// and just reset the states at frontend, 
-    //// you can uncomment it 
-    ////if you want to create new conversation at backend as well
-    // const res = await authFetch("http://localhost:5000/api/rag/conversation", {
-    //   method: "POST",
-    // });
-    // const data = await res.json();
-    // setConversationId(data.conversation_id);
     setConversationId(null);
-    setMessages(initialMessages);
+    setMessages([...initialMessages]);
+    // setMessages(initialMessages);
     loadConversations();
   };
   // Load messages when clicking chat from sidebar
@@ -188,6 +197,36 @@ export function AiChatInterface({
     setConversationId(id);
     setMessages(formatted);
   };
+  // Delete conversation from sidebar
+  const deleteConversation = async (id: string) => {
+    await authFetch(`http://localhost:5000/api/rag/conversation/${id}`, {
+      method: "DELETE",
+    });
+    await loadConversations();
+
+    // If deleted chat is active → reset UI
+    if (conversationId === id) {
+      createNewChat();
+    }
+  };
+  // Rename conversation
+  const renameConversation = async (id: string) => {
+    console.log("Renaming", id, "to", newTitle);
+    if (!newTitle.trim()) return; // ✅ prevent empty titles
+    await authFetch(`http://localhost:5000/api/rag/conversation/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ title: newTitle }),
+    });
+
+    setEditingChatId(null);
+    setNewTitle("");
+
+    await loadConversations();
+  };
+
 
   // const generateAIResponse = (question: string): string => {
   //   if (
@@ -198,7 +237,7 @@ export function AiChatInterface({
   //   }
   //   return "I understand your question. Based on current legal standards, here's what you need to know:\n\nThe law in this area has been established through several important court decisions and statutes. Generally speaking, you have certain rights and responsibilities that are protected under law.\n\nI've found some relevant cases and legal references that might help. Would you like me to connect you with a qualified attorney who can provide more specific advice for your situation?";
   // };
-
+  const displayedMessages = messages.length > 0 ? messages : initialMessages;
   return (
     <div className="grid lg:grid-cols-1 gap-6">
       {/* Main Chat Area */}
@@ -222,13 +261,72 @@ export function AiChatInterface({
                     <div
                       key={chat._id}
                       onClick={() => loadMessages(chat._id)}
-                      className={`p-2 rounded cursor-pointer mb-2 text-sm ${
+                      className={`group flex items-center gap-2 px-3 py-2 mb-2 rounded-full cursor-pointer text-sm ${
                         conversationId === chat._id
                           ? "bg-[#1E3A8A] text-white"
                           : "hover:bg-gray-200"
                       }`}
                     >
-                      <p className="truncate">{chat.title || "New Chat"}</p>
+                      {/* LEFT : 3-dot menu */}
+                    <div className="relative flex items-center">
+                      <div className="relative flex items-center">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenu(
+                              activeMenu === chat._id ? null : chat._id,
+                            );
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-300"
+                        >
+                          ⋮
+                        </button>
+                        {activeMenu === chat._id && (
+                          <div 
+                          onClick={(e)=> e.stopPropagation()}
+                          className="absolute left-0 top-8 w-32 bg-white border rounded-md shadow z-10">
+                            <button
+                              className="block w-full text-left px-3 py-2 text-black hover:bg-gray-100"
+                              onClick={() => {
+                                setEditingChatId(chat._id);
+                                setNewTitle(chat.title || "");
+                                setActiveMenu(null);
+                              }}
+                            >
+                              Rename
+                            </button>
+
+                            <button
+                              className="block w-full text-left px-3 py-2 hover:bg-red-100 text-red-600"
+                              onClick={() => deleteConversation(chat._id)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      </div>
+                      {/* LEFT: Title or Input */}
+                      <div
+                        className="flex-1 truncate"
+                        onClick={() => loadMessages(chat._id)}
+                      >
+                        {editingChatId === chat._id ? (
+                          <input
+                            className="w-full text-black px-1 bg-transparent outline-none"
+                            value={newTitle}
+                            autoFocus
+                            onChange={(e) => setNewTitle(e.target.value)}
+                            onBlur={() => renameConversation(chat._id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter")
+                                renameConversation(chat._id);
+                            }}
+                          />
+                        ) : (
+                          <p className="truncate">{chat.title || "New Chat"}</p>
+                        )}
+                      </div>
                     </div>
                   ))}
               </ScrollArea>
@@ -260,7 +358,7 @@ export function AiChatInterface({
               <CardContent className="flex-1 p-0 flex flex-col overflow-y-auto">
                 <ScrollArea className="flex-1 p-6">
                   <div className="space-y-4">
-                    {messages.map((message) => (
+                    {displayedMessages.map((message) => (
                       <div
                         key={message.id}
                         className={`flex gap-3 ${
@@ -365,7 +463,7 @@ export function AiChatInterface({
           </div>
         </Card>
       </div>
-            {/* Sidebar */}
+      {/* Sidebar */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
         {/* Quick Questions */}
         <Card className="md:col-span-2">
