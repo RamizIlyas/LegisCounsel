@@ -201,10 +201,10 @@ export function AiChatInterface({
     <div className="grid lg:grid-cols-1 gap-6">
       {/* Main Chat Area */}
       <div className="col-span-1">
-        <Card className="h-[calc(100vh-12rem)] overflow-y-auto">
+        <Card className="h-[calc(100vh-7rem)] overflow-hidden">
           <div className="flex h-full">
             {/* LEFT: Conversations Sidebar */}
-            <div className="w-64 border-r bg-[#F8FAFC] flex flex-col">
+            <div className="w-64 border-r bg-[#F8FAFC] flex flex-col h-full">
               <div className="p-3">
                 <Button
                   className="w-full bg-[#1E3A8A] text-white"
@@ -214,7 +214,7 @@ export function AiChatInterface({
                 </Button>
               </div>
 
-              <ScrollArea className="flex-1 px-2">
+              <ScrollArea className="flex-1 px-2 overflow-y-auto">
                 {Array.isArray(conversations) &&
                   conversations.map((chat) => (
                     <div
@@ -233,7 +233,7 @@ export function AiChatInterface({
             </div>
 
             {/* RIGHT: Chat Area */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col h-full overflow-hidden">
               {/* HEADER */}
               <CardHeader className="border-b bg-gradient-to-r from-[#1E3A8A] to-[#1E3A8A]/80">
                 <div className="flex items-center gap-3">
@@ -255,7 +255,7 @@ export function AiChatInterface({
               </CardHeader>
 
               {/* CHAT CONTENT */}
-              <CardContent className="flex-1 p-0 flex flex-col">
+              <CardContent className="flex-1 p-0 flex flex-col overflow-y-auto">
                 <ScrollArea className="flex-1 p-6">
                   <div className="space-y-4">
                     {messages.map((message) => (
@@ -364,9 +364,9 @@ export function AiChatInterface({
         </Card>
       </div>
             {/* Sidebar */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
         {/* Quick Questions */}
-        <Card>
+        <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle className="text-[#1E293B] flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-[#D4AF37]" />

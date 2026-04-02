@@ -106,7 +106,7 @@ export function LawyerDashboard({ onNavigate, onLogout, onRoleSwitch }: LawyerDa
       onRoleSwitch={onRoleSwitch}
       searchBar={searchBar}
     >
-      <div className="space-y-6">
+      <div className="space-y-2">
         {/* Welcome Header */}
         <div className="flex justify-between items-start">
           <div>
@@ -157,7 +157,7 @@ export function LawyerDashboard({ onNavigate, onLogout, onRoleSwitch }: LawyerDa
         </div> */}
         <AiChatInterface/>
         {/* Search and Filters */}
-        <Card>
+        {/* <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="text-[#1E293B]">AI Legal Search</CardTitle>
@@ -278,7 +278,7 @@ export function LawyerDashboard({ onNavigate, onLogout, onRoleSwitch }: LawyerDa
               ))}
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Case Detail Modal */}
