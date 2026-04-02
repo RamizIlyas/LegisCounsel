@@ -5,11 +5,12 @@ import { askRAG} from "../services/ragService.js";
 import Message from "../models/message.js";
 import { v4 as uuidv4 } from "uuid";
 import Conversation from "../models/conversation.js";
+import { protect } from "../controllers/authMiddleware.js";
 
 // Create Conversation Route
-router.post("/Conversation", async (req, res) => {
+router.post("/Conversation", protect, async (req, res) => {
   try {
-    const user_id = "user123"; // later from auth
+    const user_id = req.user.id; // Get user ID from protected middleware
 
     const conversation_id = uuidv4();
 
@@ -27,9 +28,9 @@ router.post("/Conversation", async (req, res) => {
   }
 });
 // Get All Conversations for a user
-router.get("/Conversations", async (req, res) => {
+router.get("/Conversations", protect, async (req, res) => {
   try {
-    const user_id = "user123";
+    const user_id = req.user.id;
 
     // const chats = await Conversation.find({ user_id }).sort({
     //   updated_at: -1,
@@ -44,7 +45,7 @@ router.get("/Conversations", async (req, res) => {
   }
 });
 // Get messages for a Conversation
-router.get("/messages/:id", async (req, res) => {
+router.get("/messages/:id", protect, async (req, res) => {
   try {
     const messages = await Message.find({
       conversation_id: req.params.id,
@@ -56,7 +57,7 @@ router.get("/messages/:id", async (req, res) => {
   }
 });
 // Ask RAG Route
-router.post("/ask", async (req, res) => {
+router.post("/ask", protect, async (req, res) => {
   try {
     const { question, conversation_id } = req.body;
 

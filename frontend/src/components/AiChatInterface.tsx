@@ -40,6 +40,18 @@ const quickQuestions = [
   "Explain employment discrimination laws",
 ];
 
+const authFetch = (url: string, options: any = {}) => {
+  const token = localStorage.getItem("token");
+
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      Authorization: `Bearer ${token}`,
+    },
+  });
+};
+
 interface AiChatInterfaceProps {
   onConnectWithLawyer?: () => void;
   onRoleSwitch?: () => void;
@@ -81,7 +93,7 @@ export function AiChatInterface({
     setIsTyping(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/rag/ask", {
+      const res = await authFetch("http://localhost:5000/api/rag/ask", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -89,12 +101,6 @@ export function AiChatInterface({
         body: JSON.stringify({
           question: text,
           conversation_id: currentConversationId,
-          // question: text,
-          // // Include conversation history for better context in follow-up questions
-          // history:messages.map((m)=>({
-          //   role: m.role,
-          //   content: m.content
-          // }))
         }),
       });
 
@@ -134,7 +140,7 @@ export function AiChatInterface({
     // prevent race condition
     if (isTyping) return conversationId!;
     // Otherwise create a new one
-    const res = await fetch("http://localhost:5000/api/rag/conversation", {
+    const res = await authFetch("http://localhost:5000/api/rag/conversation", {
       method: "POST",
     });
 
@@ -147,14 +153,14 @@ export function AiChatInterface({
   };
   // Load conversations
   const loadConversations = async () => {
-    const res = await fetch("http://localhost:5000/api/rag/conversations");
+    const res = await authFetch("http://localhost:5000/api/rag/conversations");
     const data = await res.json();
     setConversations(data);
   };
   // Create new conversation when component mounts
   //  if no conversation exists
   const createNewChat = async () => {
-    const res = await fetch("http://localhost:5000/api/rag/conversation", {
+    const res = await authFetch("http://localhost:5000/api/rag/conversation", {
       method: "POST",
     });
 
@@ -167,7 +173,7 @@ export function AiChatInterface({
   };
   // Load messages when clicking chat from sidebar
   const loadMessages = async (id: string) => {
-    const res = await fetch(`http://localhost:5000/api/rag/messages/${id}`);
+    const res = await authFetch(`http://localhost:5000/api/rag/messages/${id}`);
 
     const data = await res.json();
 
