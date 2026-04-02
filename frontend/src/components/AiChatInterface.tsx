@@ -119,7 +119,6 @@ export function AiChatInterface({
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
       console.error(error);
-
       setMessages((prev) => [
         ...prev,
         {
@@ -137,6 +136,7 @@ export function AiChatInterface({
   const ensureConversation = async (): Promise<string> => {
     // If already exists → just return it
     if (conversationId) return conversationId;
+
     // prevent race condition
     if (isTyping) return conversationId!;
     // Otherwise create a new one
@@ -157,18 +157,20 @@ export function AiChatInterface({
     const data = await res.json();
     setConversations(data);
   };
-  // Create new conversation when component mounts
+  // Create new conversation
   //  if no conversation exists
   const createNewChat = async () => {
-    const res = await authFetch("http://localhost:5000/api/rag/conversation", {
-      method: "POST",
-    });
-
-    const data = await res.json();
-
-    setConversationId(data.conversation_id);
+    ////Commenting it so it doesnot create new chat at backend 
+    //// and just reset the states at frontend, 
+    //// you can uncomment it 
+    ////if you want to create new conversation at backend as well
+    // const res = await authFetch("http://localhost:5000/api/rag/conversation", {
+    //   method: "POST",
+    // });
+    // const data = await res.json();
+    // setConversationId(data.conversation_id);
+    setConversationId(null);
     setMessages(initialMessages);
-
     loadConversations();
   };
   // Load messages when clicking chat from sidebar
