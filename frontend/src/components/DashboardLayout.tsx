@@ -156,7 +156,7 @@ const menuItems =
                   <Button variant="ghost" className="flex items-center gap-2">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-[#1E3A8A] text-white">
-                        {userRole === 'Lawyer' ? 'JD' : userRole === 'Client' ? 'AC' : 'AD'}
+                        {userRole === 'Lawyer' ? 'LA' : userRole === 'Client' ? 'RC' : 'AD'}
                       </AvatarFallback>
                     </Avatar>
                     <div className="hidden md:block text-left">

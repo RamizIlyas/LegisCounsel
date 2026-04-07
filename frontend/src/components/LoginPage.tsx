@@ -69,8 +69,8 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
 }
 
   const handleGuestAccess = () => {
-    toast('Continuing as guest (Lawyer view)');
-    onLogin('lawyer');
+    toast('Continuing as guest (Client view)');
+    onLogin('Client');
   };
 
   return (

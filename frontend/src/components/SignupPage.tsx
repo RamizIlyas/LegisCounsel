@@ -21,9 +21,9 @@ export function SignupPage({ onLogin, onNavigate }: SignupPageProps) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'Lawyer' | 'Client'
+  const [role, setRole] = useState<'lawyer' | 'client'
   //  | 'admin'
-                                                        >('Lawyer');
+  >('lawyer');
 
   const { login } = useAuth();
 
@@ -43,11 +43,11 @@ export function SignupPage({ onLogin, onNavigate }: SignupPageProps) {
     if (res.data.success) {
         // Store user data in context
         login(res.data.user, res.data.token); // ✅ CALL AUTH CONTEXT LOGIN
-        
-        toast.success(`Account created successfully! Welcome, ${res.data.user.name}`);
+        toast.success(`Account created successfully!`);
     }
     toast(res.data.message);
-    onLogin(role);  // or redirect user to login
+    onNavigate('login') //redirect user to login page
+    // onLogin(role);  // LogIns directly after signup
 
     } catch (error: any) {
     if (error.response) {
@@ -93,7 +93,7 @@ export function SignupPage({ onLogin, onNavigate }: SignupPageProps) {
                   <Input
                     id="name"
                     type="text"
-                    placeholder="Ali Muhammad"
+                    placeholder="John Doe"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="border-gray-300"
@@ -131,8 +131,8 @@ export function SignupPage({ onLogin, onNavigate }: SignupPageProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Lawyer">Lawyer / Legal Professional</SelectItem>
-                      <SelectItem value="Client">Client</SelectItem>
+                      <SelectItem value="lawyer">Lawyer / Legal Professional</SelectItem>
+                      <SelectItem value="client">Client</SelectItem>
                       {/* <SelectItem value="admin">Administrator</SelectItem> */}
                     </SelectContent>
                   </Select>

@@ -1,4 +1,4 @@
-import { useState,useEffect } from 'react';
+import { useState,useEffect, use } from 'react';
 import axios from 'axios';
 import { DashboardLayout } from './DashboardLayout';
 import { Button } from './ui/button';
@@ -11,6 +11,7 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Calendar } from './ui/calendar';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   Plus, 
   Search, 
@@ -89,6 +90,7 @@ interface Case {
 // ];
 
 export function CaseManagement({ userRole, onNavigate, onLogout }: CaseManagementProps) {
+  const { user } = useAuth();
   const [cases, setCases] = useState<Case[]>([]);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,6 +98,7 @@ export function CaseManagement({ userRole, onNavigate, onLogout }: CaseManagemen
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
 
   useEffect(() => {
+    console.log("Fetching cases with user:", user);
   fetchCases();
 }, []);
 
@@ -116,7 +119,8 @@ const fetchCases = async () => {
   const [newCase, setNewCase] = useState({
     name: '',
     client: '',
-    // clientEmail: '',
+    clientEmail: '',
+    lawyerEmail: '',
     caseType: '',
     nextHearing: ''
   });
@@ -125,9 +129,23 @@ const fetchCases = async () => {
     if (newCase.name && newCase.client && newCase.caseType) {
       try {
       const token = localStorage.getItem("token");
+      // ✅ Create a copy to modify before sending
+      let caseData = { ...newCase };
+
+      // ✅ Auto-fill emails based on role IF EMPTY
+      if (user) {
+        if (user.role === "lawyer" && !caseData.lawyerEmail) {
+          caseData.lawyerEmail = user.email;
+        }
+
+        if (user.role === "client" && !caseData.clientEmail) {
+          caseData.clientEmail = user.email;
+        }
+      }
+
       const res = await axios.post(
         "http://localhost:5000/api/cases", 
-        newCase,
+        caseData,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -137,7 +155,7 @@ const fetchCases = async () => {
 
       setCases([...cases, res.data]);
       setShowAddDialog(false);
-      setNewCase({ name: "", client: "", caseType: "", nextHearing: "" });
+      setNewCase({ name: "", client: "",clientEmail: '', lawyerEmail: '', caseType: "", nextHearing: "" });
 
       toast("Case added successfully");
     } catch (err) {
@@ -475,6 +493,26 @@ const fetchCases = async () => {
                 onChange={(e) => setNewCase({ ...newCase, client: e.target.value })}
               />
             </div>
+            {user?.role === "lawyer" && (
+            <div>
+              <Label htmlFor="clientEmail">Client Email</Label>
+              <Input
+                id="clientEmail"
+                placeholder="e.g., john.smith@example.com"
+                value={newCase.clientEmail}
+                onChange={(e) => setNewCase({ ...newCase, clientEmail: e.target.value })}
+              />
+            </div>)}
+            {user?.role === "client" && (
+            <div>
+              <Label htmlFor="lawyerEmail">Lawyer Email</Label>
+              <Input
+                id="lawyerEmail"
+                placeholder="e.g., jane.doe@example.com"
+                value={newCase.lawyerEmail}
+                onChange={(e) => setNewCase({ ...newCase, lawyerEmail: e.target.value })}
+              />
+            </div>)}
             <div>
               <Label htmlFor="caseType">Case Type *</Label>
               <Select value={newCase.caseType} onValueChange={(value) => setNewCase({ ...newCase, caseType: value })}>

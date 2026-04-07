@@ -489,7 +489,7 @@ export function AiChatInterface({
         </Card>
 
         {/* Help Card */}
-        {user?.role === "Client" && (
+        {user?.role === "client" && (
           <Card className="border-2 border-[#D4AF37]/20 bg-[#D4AF37]/5">
             <CardHeader>
               <CardTitle className="text-[#1E293B]">Need a Lawyer?</CardTitle>
