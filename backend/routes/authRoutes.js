@@ -1,3 +1,4 @@
+//authRoutes.js Route for User Authentication
 import express from "express";
 import { registerUser, loginUser } from "../controllers/authController.js";
 

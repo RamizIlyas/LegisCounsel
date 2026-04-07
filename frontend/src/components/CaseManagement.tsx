@@ -296,16 +296,16 @@ export function CaseManagement({
     }
   };
 
-  const getStatusIcon = (status: Case["status"]) => {
-    switch (status) {
-      case "active":
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-      case "pending":
-        return <Clock className="h-4 w-4 text-yellow-600" />;
-      case "closed":
-        return <XCircle className="h-4 w-4 text-gray-600" />;
-    }
-  };
+  // const getStatusIcon = (status: Case["status"]) => {
+  //   switch (status) {
+  //     case "active":
+  //       return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+  //     case "pending":
+  //       return <Clock className="h-4 w-4 text-yellow-600" />;
+  //     case "closed":
+  //       return <XCircle className="h-4 w-4 text-gray-600" />;
+  //   }
+  // };
 
   const getStatusBadge = (status: Case["status"]) => {
     const styles = {

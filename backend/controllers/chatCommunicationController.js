@@ -1,0 +1,143 @@
+import Conversation from "../models/chatConversation.js";// MOdel for Message Chat Communication
+import Message from "../models/chatMessage.js";// Model for individual messages in a conversation Communication
+import User from "../models/User.js";
+
+// ─── Start or Get Conversation by email ─────────────────────────────────────
+// POST /api/conversations/start  { email }
+export const startOrGetConversation = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
+
+    const otherUser = await User.findOne({ email }).select("-password");
+    if (!otherUser) return res.status(404).json({ message: "User not found" });
+
+    if (otherUser._id.toString() === req.user.id)
+      return res.status(400).json({ message: "Cannot start conversation with yourself" });
+
+    // Look for existing conversation between the two participants
+    let conversation = await Conversation.findOne({
+      participants: { $all: [req.user.id, otherUser._id], $size: 2 },
+    }).populate("participants", "-password").populate("lastMessage");
+
+    if (!conversation) {
+      conversation = await Conversation.create({
+        participants: [req.user.id, otherUser._id],
+      });
+      conversation = await conversation.populate("participants", "-password");
+    }
+
+    res.status(200).json(conversation);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+// ─── Get all conversations for logged-in user ────────────────────────────────
+// GET /api/conversations
+export const getConversations = async (req, res) => {
+  try {
+    const conversations = await Conversation.find({
+      participants: req.user.id,
+    })
+      .populate("participants", "-password")
+      .populate("lastMessage")
+      .sort({ lastMessageAt: -1 });
+
+    // Attach unread count per conversation
+    const enriched = await Promise.all(
+      conversations.map(async (conv) => {
+        const unread = await Message.countDocuments({
+          conversationId: conv._id,
+          sender: { $ne: req.user.id },
+          readBy: { $nin: [req.user.id] },
+        });
+        return { ...conv.toObject(), unread };
+      })
+    );
+
+    res.json(enriched);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+// ─── Get messages for a conversation ─────────────────────────────────────────
+// GET /api/conversations/:conversationId/messages
+export const getMessages = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+
+    // Verify the user is a participant
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      participants: req.user.id,
+    });
+    if (!conversation)
+      return res.status(403).json({ message: "Access denied" });
+
+    const messages = await Message.find({ conversationId })
+      .populate("sender", "name email role")
+      .sort({ createdAt: 1 });
+
+    // Mark incoming messages as read
+    await Message.updateMany(
+      {
+        conversationId,
+        sender: { $ne: req.user.id },
+        readBy: { $nin: [req.user.id] },
+      },
+      { $addToSet: { readBy: req.user.id } }
+    );
+
+    res.json(messages);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+// ─── Send a message ───────────────────────────────────────────────────────────
+// POST /api/conversations/:conversationId/messages  { content, attachment? }
+export const sendMessage = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { content, attachment } = req.body;
+
+    if (!content || !content.trim())
+      return res.status(400).json({ message: "Message content is required" });
+
+    // Verify the user is a participant
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      participants: req.user.id,
+    });
+    if (!conversation)
+      return res.status(403).json({ message: "Access denied" });
+
+    const message = await Message.create({
+      conversationId,
+      sender: req.user.id,
+      content: content.trim(),
+      attachment: attachment || undefined,
+      readBy: [req.user.id],
+    });
+
+    // Update conversation's lastMessage pointer
+    await Conversation.findByIdAndUpdate(conversationId, {
+      lastMessage: message._id,
+      lastMessageAt: new Date(),
+    });
+
+    const populated = await message.populate("sender", "name email role");
+
+    // Emit via Socket.IO if available (see server.js)
+    const io = req.app.get("io");
+    if (io) {
+      io.to(conversationId).emit("newMessage", populated);
+    }
+
+    res.status(201).json(populated);
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
