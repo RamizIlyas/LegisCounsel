@@ -1,6 +1,6 @@
 import express from "express";
 const router = express.Router();
-import { askRAG} from "../services/ragService.js";
+import { askRAG} from "../../frontend/src/services/ragService.js";
 // import Conversation from "backend/models/Conversation.js"; // Adjust the import path as needed
 import Message from "../models/message.js";
 import { v4 as uuidv4 } from "uuid";

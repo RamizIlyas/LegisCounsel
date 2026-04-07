@@ -1,11 +1,17 @@
-import Conversation from "../models/chatConversation.js";// MOdel for Message Chat Communication
-import Message from "../models/chatMessage.js";// Model for individual messages in a conversation Communication
+import chatConversation from "../models/chatConversation.js";// MOdel for Message Chat Communication
+import chatMessage from "../models/chatMessage.js";// Model for individual messages in a conversation Communication
 import User from "../models/User.js";
 
 // ─── Start or Get Conversation by email ─────────────────────────────────────
 // POST /api/conversations/start  { email }
 export const startOrGetConversation = async (req, res) => {
   try {
+    // Debug logging to trace the request
+    // console.log("=== START CONVERSATION HIT ===");
+    // console.log("BODY:", req.body);
+    // console.log("HEADERS:", req.headers);
+    // console.log("USER:", req.user);
+
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "Email is required" });
 
@@ -16,12 +22,12 @@ export const startOrGetConversation = async (req, res) => {
       return res.status(400).json({ message: "Cannot start conversation with yourself" });
 
     // Look for existing conversation between the two participants
-    let conversation = await Conversation.findOne({
+    let conversation = await chatConversation.findOne({
       participants: { $all: [req.user.id, otherUser._id], $size: 2 },
     }).populate("participants", "-password").populate("lastMessage");
 
     if (!conversation) {
-      conversation = await Conversation.create({
+      conversation = await chatConversation.create({
         participants: [req.user.id, otherUser._id],
       });
       conversation = await conversation.populate("participants", "-password");
@@ -30,6 +36,7 @@ export const startOrGetConversation = async (req, res) => {
     res.status(200).json(conversation);
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
+    console.error(error);
   }
 };
 
@@ -37,7 +44,7 @@ export const startOrGetConversation = async (req, res) => {
 // GET /api/conversations
 export const getConversations = async (req, res) => {
   try {
-    const conversations = await Conversation.find({
+    const conversations = await chatConversation.find({
       participants: req.user.id,
     })
       .populate("participants", "-password")
@@ -47,7 +54,7 @@ export const getConversations = async (req, res) => {
     // Attach unread count per conversation
     const enriched = await Promise.all(
       conversations.map(async (conv) => {
-        const unread = await Message.countDocuments({
+        const unread = await chatMessage.countDocuments({
           conversationId: conv._id,
           sender: { $ne: req.user.id },
           readBy: { $nin: [req.user.id] },
@@ -59,6 +66,7 @@ export const getConversations = async (req, res) => {
     res.json(enriched);
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
+    console.error(error);
   }
 };
 
@@ -69,19 +77,19 @@ export const getMessages = async (req, res) => {
     const { conversationId } = req.params;
 
     // Verify the user is a participant
-    const conversation = await Conversation.findOne({
+    const conversation = await chatConversation.findOne({
       _id: conversationId,
       participants: req.user.id,
     });
     if (!conversation)
       return res.status(403).json({ message: "Access denied" });
 
-    const messages = await Message.find({ conversationId })
+    const messages = await chatMessage.find({ conversationId })
       .populate("sender", "name email role")
       .sort({ createdAt: 1 });
 
     // Mark incoming messages as read
-    await Message.updateMany(
+    await chatMessage.updateMany(
       {
         conversationId,
         sender: { $ne: req.user.id },
@@ -107,14 +115,14 @@ export const sendMessage = async (req, res) => {
       return res.status(400).json({ message: "Message content is required" });
 
     // Verify the user is a participant
-    const conversation = await Conversation.findOne({
+    const conversation = await chatConversation.findOne({
       _id: conversationId,
       participants: req.user.id,
     });
     if (!conversation)
       return res.status(403).json({ message: "Access denied" });
 
-    const message = await Message.create({
+    const message = await chatMessage.create({
       conversationId,
       sender: req.user.id,
       content: content.trim(),
@@ -123,7 +131,7 @@ export const sendMessage = async (req, res) => {
     });
 
     // Update conversation's lastMessage pointer
-    await Conversation.findByIdAndUpdate(conversationId, {
+    await chatConversation.findByIdAndUpdate(conversationId, {
       lastMessage: message._id,
       lastMessageAt: new Date(),
     });

@@ -21,4 +21,4 @@ const conversationSchema = new mongoose.Schema(
 // Ensure a conversation between 2 users is unique
 conversationSchema.index({ participants: 1 });
 
-export default mongoose.model("Conversation", conversationSchema);
+export default mongoose.model("chatConversation", conversationSchema);

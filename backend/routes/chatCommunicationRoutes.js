@@ -5,7 +5,7 @@ import {
   getMessages,
   sendMessage,
 } from "../controllers/chatCommunicationController.js";
-import { protect } from "../middleware/authMiddleware.js";
+import { protect } from "../controllers/authMiddleware.js";
 
 const router = express.Router();
 
