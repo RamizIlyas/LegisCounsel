@@ -5,7 +5,7 @@ export const createCase = async (req, res) => {
   try {
     const newCase = new Case({
       ...req.body,
-      user: req.user._id // ✅ correct for your middleware
+      user: req.user._id, // ✅ correct for your middleware
     });
 
     const saved = await newCase.save();
@@ -18,8 +18,9 @@ export const createCase = async (req, res) => {
 // GET ALL
 export const getCases = async (req, res) => {
   try {
-    const cases = await Case.find({ user: req.user._id })
-      .sort({ createdAt: -1 });
+    const cases = await Case.find({
+      $or: [{ user: req.user._id }, { clientEmail: req.user.email }],
+    }).sort({ createdAt: -1 });
 
     res.json(cases);
   } catch (err) {

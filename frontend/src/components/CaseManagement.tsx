@@ -1,38 +1,64 @@
-import { useState,useEffect, use } from 'react';
-import axios from 'axios';
-import { DashboardLayout } from './DashboardLayout';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Calendar } from './ui/calendar';
-import { useAuth } from '../contexts/AuthContext';
-import { 
-  Plus, 
-  Search, 
-  FileText, 
-  Calendar as CalendarIcon, 
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { DashboardLayout } from "./DashboardLayout";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Badge } from "./ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "./ui/dialog";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import { Calendar } from "./ui/calendar";
+import { useAuth } from "../contexts/AuthContext";
+import {
+  Plus,
+  Search,
+  FileText,
+  Calendar as CalendarIcon,
   Clock,
   CheckCircle2,
   AlertCircle,
   XCircle,
   MoreVertical,
   Edit,
-  Trash2
-} from 'lucide-react';
+  Trash2,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from './ui/dropdown-menu';
-import type { Page, UserRole } from '../App';
+} from "./ui/dropdown-menu";
+import type { Page, UserRole } from "../App";
 import { toast } from "sonner";
+import { tr } from "date-fns/locale";
 
 interface CaseManagementProps {
   userRole: UserRole;
@@ -43,11 +69,13 @@ interface CaseManagementProps {
 interface Case {
   _id: string;
   name: string;
-  client: string;
-  status: 'active' | 'pending' | 'closed';
+  applicantName: string;
+  status: "active" | "pending" | "closed";
   nextHearing: string;
   filedDate: string;
   caseType: string;
+  caseDescription?: string;
+  lawyerEmail?: string;
 }
 
 // const mockCases: Case[] = [
@@ -89,78 +117,151 @@ interface Case {
 //   }
 // ];
 
-export function CaseManagement({ userRole, onNavigate, onLogout }: CaseManagementProps) {
+export function CaseManagement({
+  userRole,
+  onNavigate,
+  onLogout,
+}: CaseManagementProps) {
   const { user } = useAuth();
   const [cases, setCases] = useState<Case[]>([]);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
+    new Date(),
+  );
+  const [viewMode, setViewMode] = useState<"table" | "calendar">("table");
+  const [editingCase, setEditingCase] = useState<any | null>(null);
+  // Form states for editing
+  const [status, setStatus] = useState("active"); // new
+
+  useEffect(() => {
+    if (editingCase) {
+      setNewCase({
+        name: editingCase.name,
+        applicantName: editingCase.client,
+        clientEmail: editingCase.clientEmail || "",
+        lawyerEmail: editingCase.lawyerEmail || "",
+        caseType: editingCase.caseType,
+        nextHearing: editingCase.nextHearing?.split("T")[0] || "",
+        caseDescription: editingCase.caseDescription || "",
+      });
+      setStatus(editingCase.status || "active");
+    } else {
+      // ✅ reset when not editing
+      setNewCase({
+        name: "",
+        applicantName: "",
+        clientEmail: "",
+        lawyerEmail: "",
+        caseType: "",
+        nextHearing: "",
+        caseDescription: "",
+      });
+      setStatus("active");
+    }
+  }, [editingCase]);
 
   useEffect(() => {
     console.log("Fetching cases with user:", user);
-  fetchCases();
-}, []);
+    fetchCases();
+  }, []);
 
-const fetchCases = async () => {
-  try {
-    const token = localStorage.getItem("token");
-    const res = await axios.get("http://localhost:5000/api/cases", {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-    setCases(res.data);
-  } catch (err) {
-    toast("Error fetching cases");
-  }
-}; 
+  const fetchCases = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get("http://localhost:5000/api/cases", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      setCases(res.data);
+    } catch (err) {
+      toast("Error fetching cases");
+    }
+  };
 
   const [newCase, setNewCase] = useState({
-    name: '',
-    client: '',
-    clientEmail: '',
-    lawyerEmail: '',
-    caseType: '',
-    nextHearing: ''
+    name: "",
+    applicantName: "",
+    clientEmail: "",
+    lawyerEmail: "",
+    caseType: "",
+    nextHearing: "",
+    caseDescription: "",
   });
 
+  const handleEdit = (caseItem: any) => {
+    setEditingCase(caseItem); // store selected case
+    setShowAddDialog(true); // open dialog
+  };
+  const handleClose = () => {
+    setShowAddDialog(false);
+    setEditingCase(null);
+  };
+
   const handleAddCase = async () => {
-    if (newCase.name && newCase.client && newCase.caseType) {
+    if (newCase.name && newCase.applicantName && newCase.caseType) {
       try {
-      const token = localStorage.getItem("token");
-      // ✅ Create a copy to modify before sending
-      let caseData = { ...newCase };
+        const token = localStorage.getItem("token");
+        // ✅ Create a copy to modify before sending
+        let caseData = { ...newCase };
+        let res = null;
+        // ✅ Auto-fill emails based on role IF EMPTY
+        if (user) {
+          if (user.role === "lawyer" && !caseData.lawyerEmail) {
+            caseData.lawyerEmail = user.email;
+          }
 
-      // ✅ Auto-fill emails based on role IF EMPTY
-      if (user) {
-        if (user.role === "lawyer" && !caseData.lawyerEmail) {
-          caseData.lawyerEmail = user.email;
-        }
-
-        if (user.role === "client" && !caseData.clientEmail) {
-          caseData.clientEmail = user.email;
-        }
-      }
-
-      const res = await axios.post(
-        "http://localhost:5000/api/cases", 
-        caseData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
+          if (user.role === "client" && !caseData.clientEmail) {
+            caseData.clientEmail = user.email;
           }
         }
-      );
 
-      setCases([...cases, res.data]);
-      setShowAddDialog(false);
-      setNewCase({ name: "", client: "",clientEmail: '', lawyerEmail: '', caseType: "", nextHearing: "" });
+        if (editingCase) {
+          // UPDATE
+          res = await axios.put(
+            `http://localhost:5000/api/cases/${editingCase._id}`,
+            { ...caseData, status },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+        } else {
+          res = await axios.post("http://localhost:5000/api/cases", caseData, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+        }
 
-      toast("Case added successfully");
-    } catch (err) {
-      toast("Error adding case");
-    }
+        // setCases([...cases, res.data]);
+        if (editingCase) {
+          setCases(
+            cases.map((c) => (c._id === editingCase._id ? res.data : c)),
+          );
+        } else {
+          setCases([...cases, res.data]);
+        }
+        handleClose();
+        setNewCase({
+          name: "",
+          applicantName: "",
+          clientEmail: "",
+          lawyerEmail: "",
+          caseType: "",
+          nextHearing: "",
+          caseDescription: "",
+        });
+
+        toast(
+          editingCase ? "Case updated successfully" : "Case added successfully",
+        );
+      } catch (err) {
+        toast(editingCase ? "Error updating case" : "Error adding case");
+      }
       // const caseToAdd: Case = {
       //   id: Date.now().toString(),
       //   name: newCase.name,
@@ -175,57 +276,63 @@ const fetchCases = async () => {
       // setNewCase({ name: '', client: '', caseType: '', nextHearing: '' });
       // toast('Case added successfully');
     } else {
-      toast('Please fill in all required fields');
+      toast("Please fill in all required fields");
     }
   };
 
   const handleDeleteCase = async (id: string) => {
     try {
-    const token = localStorage.getItem("token");
-    console.log("Token for deletion:", token);
-    await axios.delete(`http://localhost:5000/api/cases/${id}`
-      , {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+      const token = localStorage.getItem("token");
+      console.log("Token for deletion:", token);
+      await axios.delete(`http://localhost:5000/api/cases/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setCases(cases.filter((c) => c._id !== id));
+      toast("Case deleted");
+    } catch (err) {
+      toast("Error deleting case");
     }
-    );
-    setCases(cases.filter(c => c._id !== id));
-    toast("Case deleted");
-  } catch (err) {
-    toast("Error deleting case");
-  }
   };
 
-  const getStatusIcon = (status: Case['status']) => {
+  const getStatusIcon = (status: Case["status"]) => {
     switch (status) {
-      case 'active':
+      case "active":
         return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-      case 'pending':
+      case "pending":
         return <Clock className="h-4 w-4 text-yellow-600" />;
-      case 'closed':
+      case "closed":
         return <XCircle className="h-4 w-4 text-gray-600" />;
     }
   };
 
-  const getStatusBadge = (status: Case['status']) => {
+  const getStatusBadge = (status: Case["status"]) => {
     const styles = {
-      active: 'bg-green-100 text-green-800 border-green-200',
-      pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      closed: 'bg-gray-100 text-gray-800 border-gray-200'
+      active: "bg-green-100 text-green-800 border-green-200",
+      pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      closed: "bg-gray-100 text-gray-800 border-gray-200",
     };
-    return <Badge variant="outline" className={styles[status]}>{status.toUpperCase()}</Badge>;
+    return (
+      <Badge variant="outline" className={styles[status]}>
+        {status.toUpperCase()}
+      </Badge>
+    );
   };
 
-  const filteredCases = cases.filter(c =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.caseType.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredCases = cases.filter(
+    (c) =>
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.applicantName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.caseType.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const upcomingHearings = cases
-    .filter(c => new Date(c.nextHearing) >= new Date())
-    .sort((a, b) => new Date(a.nextHearing).getTime() - new Date(b.nextHearing).getTime())
+    .filter((c) => new Date(c.nextHearing) >= new Date())
+    .sort(
+      (a, b) =>
+        new Date(a.nextHearing).getTime() - new Date(b.nextHearing).getTime(),
+    )
     .slice(0, 5);
 
   return (
@@ -240,9 +347,11 @@ const fetchCases = async () => {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-[#1E293B] mb-2">Case Management</h1>
-            <p className="text-gray-600">Track and manage all your legal cases</p>
+            <p className="text-gray-600">
+              Track and manage all your legal cases
+            </p>
           </div>
-          <Button 
+          <Button
             onClick={() => setShowAddDialog(true)}
             className="bg-[#1E3A8A] hover:bg-[#1E3A8A]/90"
           >
@@ -262,19 +371,25 @@ const fetchCases = async () => {
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Active Cases</CardDescription>
-              <CardTitle className="text-green-600">{cases.filter(c => c.status === 'active').length}</CardTitle>
+              <CardTitle className="text-green-600">
+                {cases.filter((c) => c.status === "active").length}
+              </CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Pending</CardDescription>
-              <CardTitle className="text-yellow-600">{cases.filter(c => c.status === 'pending').length}</CardTitle>
+              <CardTitle className="text-yellow-600">
+                {cases.filter((c) => c.status === "pending").length}
+              </CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Closed</CardDescription>
-              <CardTitle className="text-gray-600">{cases.filter(c => c.status === 'closed').length}</CardTitle>
+              <CardTitle className="text-gray-600">
+                {cases.filter((c) => c.status === "closed").length}
+              </CardTitle>
             </CardHeader>
           </Card>
         </div>
@@ -288,16 +403,16 @@ const fetchCases = async () => {
                   <CardTitle className="text-[#1E293B]">All Cases</CardTitle>
                   <div className="flex gap-2">
                     <Button
-                      variant={viewMode === 'table' ? 'default' : 'outline'}
+                      variant={viewMode === "table" ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setViewMode('table')}
+                      onClick={() => setViewMode("table")}
                     >
                       <FileText className="h-4 w-4" />
                     </Button>
                     <Button
-                      variant={viewMode === 'calendar' ? 'default' : 'outline'}
+                      variant={viewMode === "calendar" ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setViewMode('calendar')}
+                      onClick={() => setViewMode("calendar")}
                     >
                       <CalendarIcon className="h-4 w-4" />
                     </Button>
@@ -314,7 +429,7 @@ const fetchCases = async () => {
                 </div>
               </CardHeader>
               <CardContent>
-                {viewMode === 'table' ? (
+                {viewMode === "table" ? (
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader>
@@ -322,6 +437,7 @@ const fetchCases = async () => {
                           <TableHead>Case Name</TableHead>
                           <TableHead>Client</TableHead>
                           <TableHead>Type</TableHead>
+                          <TableHead>Description</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Next Hearing</TableHead>
                           <TableHead></TableHead>
@@ -336,36 +452,53 @@ const fetchCases = async () => {
                                 {caseItem.name}
                               </div>
                             </TableCell>
-                            <TableCell>{caseItem.client}</TableCell>
+                            <TableCell>{caseItem.applicantName}</TableCell>
                             <TableCell>{caseItem.caseType}</TableCell>
-                            <TableCell>{getStatusBadge(caseItem.status)}</TableCell>
+                            <TableCell>{caseItem.caseDescription}</TableCell>
+                            <TableCell>
+                              {getStatusBadge(caseItem.status)}
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2 text-sm">
                                 <CalendarIcon className="h-4 w-4 text-gray-400" />
-                                {new Date(caseItem.nextHearing).toLocaleDateString()}
+                                {new Date(
+                                  caseItem.nextHearing,
+                                ).toLocaleDateString()}
                               </div>
                             </TableCell>
                             <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    className="text-red-600"
-                                    onClick={() => handleDeleteCase(caseItem._id)}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              {
+                                //If the user is a client and the case has a lawyer assigned, hide the edit/delete options
+                                !(
+                                  user?.role === "client" &&
+                                  caseItem.lawyerEmail?.trim()
+                                ) && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem
+                                        onClick={() => handleEdit(caseItem)}
+                                      >
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        className="text-red-600"
+                                        onClick={() =>
+                                          handleDeleteCase(caseItem._id)
+                                        }
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )
+                              }
                             </TableCell>
                           </TableRow>
                         ))}
@@ -375,43 +508,67 @@ const fetchCases = async () => {
                 ) : (
                   <div className="space-y-3">
                     {filteredCases.map((caseItem) => (
-                      <Card key={caseItem._id} className="border-l-4 border-l-[#1E3A8A]">
+                      <Card
+                        key={caseItem._id}
+                        className="border-l-4 border-l-[#1E3A8A]"
+                      >
                         <CardContent className="p-4">
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
                                 <FileText className="h-4 w-4 text-[#1E3A8A]" />
-                                <h4 className="text-[#1E293B]">{caseItem.name}</h4>
+                                <h4 className="text-[#1E293B]">
+                                  {caseItem.name}
+                                </h4>
                               </div>
-                              <p className="text-sm text-gray-600 mb-2">{caseItem.client} • {caseItem.caseType}</p>
+                              <p className="text-sm text-gray-600 mb-2">
+                                {caseItem.applicantName} • {caseItem.caseType}
+                              </p>
+                              <p className="text-sm text-gray-600 mb-2">
+                                {caseItem.caseDescription}
+                              </p>
                               <div className="flex items-center gap-4 text-sm">
                                 {getStatusBadge(caseItem.status)}
                                 <span className="text-gray-500 flex items-center gap-1">
                                   <CalendarIcon className="h-3 w-3" />
-                                  {new Date(caseItem.nextHearing).toLocaleDateString()}
+                                  {new Date(
+                                    caseItem.nextHearing,
+                                  ).toLocaleDateString()}
                                 </span>
                               </div>
                             </div>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  className="text-red-600"
-                                  onClick={() => handleDeleteCase(caseItem._id)}
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            {
+                              //If the user is a client and the case has a lawyer assigned, hide the edit/delete options
+                              !(
+                                user?.role === "client" &&
+                                caseItem.lawyerEmail?.trim()
+                              ) && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      onClick={() => handleEdit(caseItem)}
+                                    >
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="text-red-600"
+                                      onClick={() =>
+                                        handleDeleteCase(caseItem._id)
+                                      }
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )
+                            }
                           </div>
                         </CardContent>
                       </Card>
@@ -454,7 +611,9 @@ const fetchCases = async () => {
                       <CalendarIcon className="h-4 w-4 text-[#1E3A8A] mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm truncate">{caseItem.name}</p>
-                        <p className="text-xs text-gray-600">{caseItem.client}</p>
+                        <p className="text-xs text-gray-600">
+                          {caseItem.applicantName} • {caseItem.caseType}
+                        </p>
                         <p className="text-xs text-[#D4AF37] mt-1">
                           {new Date(caseItem.nextHearing).toLocaleDateString()}
                         </p>
@@ -468,11 +627,21 @@ const fetchCases = async () => {
         </div>
       </div>
 
-      {/* Add Case Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+      {/* Add/Edit Case Dialog */}
+      <Dialog
+        open={showAddDialog}
+        onOpenChange={(open) => {
+          setShowAddDialog(open);
+          if (!open) {
+            setEditingCase(null); // ✅ reset when closing
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-[#1E293B]">Add New Case</DialogTitle>
+            <DialogTitle className="text-[#1E293B]">
+              {editingCase ? "Edit Case" : "Add New Case"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -481,41 +650,57 @@ const fetchCases = async () => {
                 id="caseName"
                 placeholder="e.g., Smith v. Johnson"
                 value={newCase.name}
-                onChange={(e) => setNewCase({ ...newCase, name: e.target.value })}
+                onChange={(e) =>
+                  setNewCase({ ...newCase, name: e.target.value })
+                }
               />
             </div>
             <div>
-              <Label htmlFor="client">Client Name *</Label>
+              <Label htmlFor="client">Applicant Name *</Label>
               <Input
+                required={true}
                 id="client"
                 placeholder="e.g., John Smith"
-                value={newCase.client}
-                onChange={(e) => setNewCase({ ...newCase, client: e.target.value })}
+                value={newCase.applicantName}
+                onChange={(e) =>
+                  setNewCase({ ...newCase, applicantName: e.target.value })
+                }
               />
             </div>
             {user?.role === "lawyer" && (
-            <div>
-              <Label htmlFor="clientEmail">Client Email</Label>
-              <Input
-                id="clientEmail"
-                placeholder="e.g., john.smith@example.com"
-                value={newCase.clientEmail}
-                onChange={(e) => setNewCase({ ...newCase, clientEmail: e.target.value })}
-              />
-            </div>)}
-            {user?.role === "client" && (
-            <div>
-              <Label htmlFor="lawyerEmail">Lawyer Email</Label>
-              <Input
-                id="lawyerEmail"
-                placeholder="e.g., jane.doe@example.com"
-                value={newCase.lawyerEmail}
-                onChange={(e) => setNewCase({ ...newCase, lawyerEmail: e.target.value })}
-              />
-            </div>)}
+              <div>
+                <Label htmlFor="clientEmail">Client Email</Label>
+                <Input
+                  id="clientEmail"
+                  placeholder="e.g., john.smith@example.com"
+                  value={newCase.clientEmail}
+                  onChange={(e) =>
+                    setNewCase({ ...newCase, clientEmail: e.target.value })
+                  }
+                />
+              </div>
+            )}
+            {/* {user?.role === "client" && (
+              <div>
+                <Label htmlFor="lawyerEmail">Lawyer Email</Label>
+                <Input
+                  id="lawyerEmail"
+                  placeholder="e.g., jane.doe@example.com"
+                  value={newCase.lawyerEmail}
+                  onChange={(e) =>
+                    setNewCase({ ...newCase, lawyerEmail: e.target.value })
+                  }
+                />
+              </div>
+            )} */}
             <div>
               <Label htmlFor="caseType">Case Type *</Label>
-              <Select value={newCase.caseType} onValueChange={(value) => setNewCase({ ...newCase, caseType: value })}>
+              <Select
+                value={newCase.caseType}
+                onValueChange={(value) =>
+                  setNewCase({ ...newCase, caseType: value })
+                }
+              >
                 <SelectTrigger id="caseType">
                   <SelectValue placeholder="Select case type" />
                 </SelectTrigger>
@@ -523,31 +708,64 @@ const fetchCases = async () => {
                   <SelectItem value="Employment Law">Employment Law</SelectItem>
                   <SelectItem value="Civil Rights">Civil Rights</SelectItem>
                   <SelectItem value="Property Law">Property Law</SelectItem>
-                  <SelectItem value="Estate Planning">Estate Planning</SelectItem>
-                  <SelectItem value="Criminal Defense">Criminal Defense</SelectItem>
+                  <SelectItem value="Estate Planning">
+                    Estate Planning
+                  </SelectItem>
+                  <SelectItem value="Criminal Defense">
+                    Criminal Defense
+                  </SelectItem>
                   <SelectItem value="Family Law">Family Law</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {editingCase && (
+              <div>
+                <Label>Status</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label htmlFor="nextHearing">Next Hearing Date</Label>
               <Input
                 id="nextHearing"
                 type="date"
                 value={newCase.nextHearing}
-                onChange={(e) => setNewCase({ ...newCase, nextHearing: e.target.value })}
+                required={true}
+                onChange={(e) =>
+                  setNewCase({ ...newCase, nextHearing: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label htmlFor="caseDescription">Case Description</Label>
+              <Textarea
+                id="caseDescription"
+                placeholder="e.g., Describe the case in detail..."
+                value={newCase.caseDescription}
+                onChange={(e) =>
+                  setNewCase({ ...newCase, caseDescription: e.target.value })
+                }
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+            <Button variant="outline" onClick={() => handleClose()}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleAddCase}
               className="bg-[#1E3A8A] hover:bg-[#1E3A8A]/90"
             >
-              Add Case
+              {editingCase ? "Update Case" : "Add Case"}
             </Button>
           </DialogFooter>
         </DialogContent>
