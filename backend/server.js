@@ -1,8 +1,10 @@
 import express from "express";
 import cors from "cors";
-import mongoose from "mongoose";
+import path from "path";
+import { fileURLToPath } from "url";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import fs from "fs";
 
 // DB
 import connectDB from "./config/db.js";
@@ -13,17 +15,18 @@ import ragRoutes from "./routes/ragRoutes.js";
 import caseRoutes from "./routes/caseRoutes.js";
 import communicationRoutes from "./routes/chatCommunicationRoutes.js";
 
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+ 
+
 const app = express();
 const httpServer = createServer(app);
 
 // ─── Connect DB ─────────────────────────────────────────────
 connectDB(); // your custom connection (preferred)
-
-// OPTIONAL: If you want fallback or direct mongoose usage
-// const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/legalapp";
-// mongoose.connect(MONGO_URI)
-//   .then(() => console.log("MongoDB connected"))
-//   .catch(err => console.error("MongoDB error:", err));
 
 // ─── Socket.IO Setup ───────────────────────────────────────
 const io = new Server(httpServer, {
@@ -60,6 +63,15 @@ app.use("/api/auth", authRoutes);
 app.use("/api/rag", ragRoutes);
 app.use("/api/cases", caseRoutes);
 app.use("/api/conversations", communicationRoutes);
+
+// ─── Multer error handler ─────────────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  if (err.code === "LIMIT_FILE_SIZE")
+    return res.status(400).json({ message: "File too large (max 20 MB)" });
+  if (err.message?.includes("not allowed"))
+    return res.status(400).json({ message: err.message });
+  next(err);
+});
 
 // ─── Start Server ─────────────────────────────────────────
 const PORT = process.env.PORT || 5000;

@@ -1,10 +1,8 @@
 // src/services/communicationService.ts
-// Drop-in API layer for the Communication component.
-// All functions read the JWT from localStorage (key: "token").
 
 const BASE = "http://localhost:5000/api";
 
-function authHeaders() {
+function authHeaders(): Record<string, string> {
   const token = localStorage.getItem("token");
   return {
     "Content-Type": "application/json",
@@ -12,19 +10,19 @@ function authHeaders() {
   };
 }
 
+function authHeadersNoContentType(): Record<string, string> {
+  const token = localStorage.getItem("token");
+  return { Authorization: `Bearer ${token}` };
+}
+
 // ─── Conversations ────────────────────────────────────────────────────────────
 
-/** Fetch all conversations the current user is part of */
 export async function getConversations() {
   const res = await fetch(`${BASE}/conversations`, { headers: authHeaders() });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-/**
- * Start (or retrieve) a conversation with another user by their email.
- * Returns the Conversation object.
- */
 export async function startConversation(email: string) {
   const res = await fetch(`${BASE}/conversations/start`, {
     method: "POST",
@@ -35,9 +33,29 @@ export async function startConversation(email: string) {
   return res.json();
 }
 
+/** Soft-delete the conversation for the current user */
+export async function deleteConversation(conversationId: string) {
+  const res = await fetch(`${BASE}/conversations/${conversationId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+/** Set a custom per-user name for a conversation */
+export async function renameConversation(conversationId: string, name: string) {
+  const res = await fetch(`${BASE}/conversations/${conversationId}/rename`, {
+    method: "PATCH",
+    headers: authHeaders(),
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 // ─── Messages ─────────────────────────────────────────────────────────────────
 
-/** Fetch all messages in a conversation (also marks them as read) */
 export async function getMessages(conversationId: string) {
   const res = await fetch(`${BASE}/conversations/${conversationId}/messages`, {
     headers: authHeaders(),
@@ -46,16 +64,33 @@ export async function getMessages(conversationId: string) {
   return res.json();
 }
 
-/** Send a text message (with optional attachment metadata) */
-export async function sendMessage(
-  conversationId: string,
-  content: string,
-  attachment?: { name: string; url: string; type: string }
-) {
+export async function sendMessage(conversationId: string, content: string) {
   const res = await fetch(`${BASE}/conversations/${conversationId}/messages`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify({ content, attachment }),
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+/**
+ * Upload a file attachment (and optional caption) as a message.
+ * Uses multipart/form-data — do NOT pass Content-Type manually.
+ */
+export async function sendFile(
+  conversationId: string,
+  file: File,
+  caption?: string
+) {
+  const form = new FormData();
+  form.append("file", file);
+  if (caption) form.append("caption", caption);
+
+  const res = await fetch(`${BASE}/conversations/${conversationId}/upload`, {
+    method: "POST",
+    headers: authHeadersNoContentType(), // browser sets Content-Type with boundary
+    body: form,
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();

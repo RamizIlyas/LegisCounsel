@@ -12,11 +12,13 @@ const messageSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    content: { type: String, required: true },
+    // Text content is optional when a file is attached
+    content: { type: String, default: "" },
     attachment: {
-      name: String,
-      url: String,
-      type: String,
+      name:     String,   // original filename
+      url:      String,   // served URL  e.g. /uploads/abc123.pdf
+      mimeType: String,   // e.g. application/pdf, image/png
+      size:     Number,   // bytes
     },
     readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },

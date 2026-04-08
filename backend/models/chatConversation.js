@@ -14,8 +14,18 @@ const conversationSchema = new mongoose.Schema(
       ref: "Message",
     },
     lastMessageAt: { type: Date, default: Date.now },
+
+    // Per-user custom chat name  →  { "<userId>": "My Custom Name" }
+    nicknames: {
+      type: Map,
+      of: String,
+      default: {},
+    },
+    // Soft-delete: stores IDs of users who deleted this conversation for themselves
+    deletedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
-  { timestamps: true }
+
+  { timestamps: true },
 );
 
 // Ensure a conversation between 2 users is unique
