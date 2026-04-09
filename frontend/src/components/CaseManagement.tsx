@@ -60,6 +60,7 @@ import type { Page, UserRole } from "../App";
 import { toast } from "sonner";
 import { tr } from "date-fns/locale";
 
+const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
 interface CaseManagementProps {
   userRole: UserRole;
   onNavigate: (page: Page) => void;
@@ -169,7 +170,7 @@ export function CaseManagement({
   const fetchCases = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5000/api/cases", {
+      const res = await axios.get(`${BACKEND_API_URL}/api/cases`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -221,7 +222,7 @@ export function CaseManagement({
         if (editingCase) {
           // UPDATE
           res = await axios.put(
-            `http://localhost:5000/api/cases/${editingCase._id}`,
+            `${BACKEND_API_URL}/api/cases/${editingCase._id}`,
             { ...caseData, status },
             {
               headers: {
@@ -230,7 +231,7 @@ export function CaseManagement({
             },
           );
         } else {
-          res = await axios.post("http://localhost:5000/api/cases", caseData, {
+          res = await axios.post(`${BACKEND_API_URL}/api/cases`, caseData, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -284,7 +285,7 @@ export function CaseManagement({
     try {
       const token = localStorage.getItem("token");
       console.log("Token for deletion:", token);
-      await axios.delete(`http://localhost:5000/api/cases/${id}`, {
+      await axios.delete(`${BACKEND_API_URL}/api/cases/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

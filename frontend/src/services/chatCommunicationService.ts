@@ -1,6 +1,6 @@
 // src/services/communicationService.ts
 
-const BASE = "http://localhost:5000/api";
+const BASE = import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000/api";
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem("token");

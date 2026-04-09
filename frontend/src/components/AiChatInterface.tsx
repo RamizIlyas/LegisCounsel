@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
 
 interface Message {
   id: string;
@@ -110,7 +111,7 @@ export function AiChatInterface({
     setIsTyping(true);
 
     try {
-      const res = await authFetch("http://localhost:5000/api/rag/ask", {
+      const res = await authFetch(`${BACKEND_API_URL}/api/rag/ask`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -157,7 +158,7 @@ export function AiChatInterface({
     // prevent race condition
     if (isTyping) return conversationId!;
     // Otherwise create a new one
-    const res = await authFetch("http://localhost:5000/api/rag/conversation", {
+    const res = await authFetch(`${BACKEND_API_URL}/api/rag/conversation`, {
       method: "POST",
     });
 
@@ -170,7 +171,7 @@ export function AiChatInterface({
   };
   // Load conversations
   const loadConversations = async () => {
-    const res = await authFetch("http://localhost:5000/api/rag/conversations");
+    const res = await authFetch(`${BACKEND_API_URL}/api/rag/conversations`);
     const data = await res.json();
     setConversations(data);
   };
@@ -184,7 +185,7 @@ export function AiChatInterface({
   };
   // Load messages when clicking chat from sidebar
   const loadMessages = async (id: string) => {
-    const res = await authFetch(`http://localhost:5000/api/rag/messages/${id}`);
+    const res = await authFetch(`${BACKEND_API_URL}/api/rag/messages/${id}`);
 
     const data = await res.json();
 
@@ -199,7 +200,7 @@ export function AiChatInterface({
   };
   // Delete conversation from sidebar
   const deleteConversation = async (id: string) => {
-    await authFetch(`http://localhost:5000/api/rag/conversation/${id}`, {
+    await authFetch(`${BACKEND_API_URL}/api/rag/conversation/${id}`, {
       method: "DELETE",
     });
     await loadConversations();
@@ -213,7 +214,7 @@ export function AiChatInterface({
   const renameConversation = async (id: string) => {
     console.log("Renaming", id, "to", newTitle);
     if (!newTitle.trim()) return; // ✅ prevent empty titles
-    await authFetch(`http://localhost:5000/api/rag/conversation/${id}`, {
+    await authFetch(`${BACKEND_API_URL}/api/rag/conversation/${id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",

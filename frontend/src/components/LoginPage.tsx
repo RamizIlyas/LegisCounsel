@@ -10,6 +10,8 @@ import type { Page, UserRole } from '../App';
 import { AuthIllustration } from './AuthIllustration';
 import { toast } from "sonner";
 import { useAuth} from '../contexts/AuthContext';
+const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
+
 interface LoginPageProps {
   onLogin: (role: UserRole) => void;
   onNavigate: (page: Page) => void;
@@ -27,7 +29,7 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
     e.preventDefault();
     if (!email || !password) return toast.error("Please fill in all fields");
     try{
-    const response = await fetch('http://localhost:5000/api/auth/login', {
+    const response = await fetch(`${BACKEND_API_URL}/api/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

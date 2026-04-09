@@ -12,6 +12,8 @@ import axios from "axios";
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 
+const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
+
 interface SignupPageProps {
   onLogin: (role: UserRole) => void;
   onNavigate: (page: Page) => void;
@@ -32,7 +34,7 @@ export function SignupPage({ onLogin, onNavigate }: SignupPageProps) {
     if (!email || !password || !name) return toast("Please fill in all fields");
 
     try {
-    const res = await axios.post("http://localhost:5000/api/auth/signup", {
+    const res = await axios.post(`${BACKEND_API_URL}/api/auth/signup`, {
     name,
     email,
     password,

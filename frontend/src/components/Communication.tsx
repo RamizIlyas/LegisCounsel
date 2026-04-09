@@ -66,8 +66,7 @@ interface BackendMessage {
   createdAt: string;
   attachment?: { name: string; url: string; mimeType: string; size: number };
 }
-
-const SOCKET_URL = "http://localhost:5000";
+const SOCKET_URL = import.meta.env.VITE_BACKEND_API_URL ||"http://localhost:5000";
 
 export function Communication({
   userRole,
