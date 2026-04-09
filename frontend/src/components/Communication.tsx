@@ -77,6 +77,7 @@ export function Communication({
   const currentUser: BackendUser = JSON.parse(
     localStorage.getItem("user") || "{}",
   );
+  const currentUserId = currentUser._id || (currentUser as any).id;
 
   const [conversations, setConversations] = useState<BackendConversation[]>([]);
   const [selectedConv, setSelectedConv] = useState<BackendConversation | null>(
@@ -162,6 +163,8 @@ export function Communication({
     (async () => {
       try {
         const data = await getConversations();
+        // console.log("Fetched conversations: Coversations Gotten", data);
+        // console.log("Full localStorage user:", JSON.parse(localStorage.getItem("user") || "{}"));
         setConversations(data);
         if (data.length > 0) selectConversation(data[0]);
       } catch {
@@ -225,7 +228,8 @@ export function Communication({
       );
       setFilePreview(null);
       setInputValue("");
-    } catch {
+    } catch (err) {
+      console.error("Error uploading file:", err);
       setError("Failed to upload file");
     } finally {
       setUploadingFile(false);
@@ -309,12 +313,13 @@ export function Communication({
   };
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
+
   const getOtherParticipant = (conv: BackendConversation): BackendUser => {
-    const other = conv.participants.find(
-      (p) => p._id?.toString() !== currentUser._id?.toString(),
-    );
-    return other ?? conv.participants[0];
-  };
+  const other = conv.participants.find(
+    (p) => p._id?.toString() !== currentUserId?.toString()
+  );
+  return other ?? conv.participants[1]; // fallback to index 1, not 0
+};
   const displayName = (conv: BackendConversation) =>
     conv.customName ?? getOtherParticipant(conv).name;
 
@@ -440,15 +445,17 @@ export function Communication({
                     {filteredConvs.map((conv) => {
                       const other = getOtherParticipant(conv);
                       //Logging for Debugging
-                      console.log("Rendering conversation with", other.name);
-                      console.log("Object : ", other);
+                      // console.log("Rendering conversation with", other.name);
+                      // console.log("Object : ", other);
 
                       const isActive = selectedConv?._id === conv._id;
                       const isRenaming = renamingId === conv._id;
                       const isMenuOpen = menuConvId === conv._id;
                       return (
-                        <button
+                        <div
                           key={conv._id}
+                          role="button"
+                          tabIndex={0}
                           onClick={() => {
                             setMenuConvId(null);
                             selectConversation(conv);
@@ -458,6 +465,7 @@ export function Communication({
                               ? "bg-[#1E3A8A]/10 border border-[#1E3A8A]/20"
                               : "hover:bg-gray-100"
                           }`}
+                          style={{ cursor: "default" }}
                         >
                           <div className="relative">
                             <Avatar>
@@ -575,7 +583,7 @@ export function Communication({
                               </button>
                             </div>
                           )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -623,7 +631,7 @@ export function Communication({
                               </div>
                             </div>
                             <div className="flex gap-2">
-                              <Button variant="ghost" size="icon">
+                              {/* <Button variant="ghost" size="icon">
                                 <Phone className="h-5 w-5 text-gray-600" />
                               </Button>
                               <Button variant="ghost" size="icon">
@@ -631,7 +639,7 @@ export function Communication({
                               </Button>
                               <Button variant="ghost" size="icon">
                                 <MoreVertical className="h-5 w-5 text-gray-600" />
-                              </Button>
+                              </Button> */}
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -888,7 +896,10 @@ export function Communication({
       {/* </Card> */}
       {/* Close menu on outside click */}
       {menuConvId && (
-        <div className="fixed inset-0 z-10" onClick={() => setMenuConvId(null)} />
+        <div
+          className="fixed inset-0 z-10"
+          onClick={() => setMenuConvId(null)}
+        />
       )}
     </DashboardLayout>
   );

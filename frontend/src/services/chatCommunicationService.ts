@@ -60,6 +60,8 @@ export async function getMessages(conversationId: string) {
   const res = await fetch(`${BASE}/conversations/${conversationId}/messages`, {
     headers: authHeaders(),
   });
+  // const messages = await res.json();
+  // console.log("getMessages response:", messages);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

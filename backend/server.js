@@ -59,6 +59,8 @@ app.use(cors());
 app.use(express.json());
 
 // ─── Routes ───────────────────────────────────────────────
+// Serve uploaded files statically
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/auth", authRoutes);
 app.use("/api/rag", ragRoutes);
 app.use("/api/cases", caseRoutes);

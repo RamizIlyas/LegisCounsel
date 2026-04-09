@@ -181,7 +181,7 @@ export const sendFile = async (req, res) => {
     const { originalname, mimetype, size, filename } = req.file;
     const caption = req.body.caption?.trim() || "";
  
-    const message = await Message.create({
+    const message = await chatMessage.create({
       conversationId,
       sender: req.user.id,
       content: caption,
