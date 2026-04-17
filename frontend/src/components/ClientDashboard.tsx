@@ -304,7 +304,7 @@ interface ClientDashboardProps {
 export function ClientDashboard({ onNavigate, onLogout, onRoleSwitch }: ClientDashboardProps) {
   return (
     <DashboardLayout
-      userRole="Client"
+      userRole="client"
       currentPage="dashboard"
       onNavigate={onNavigate}
       onLogout={onLogout}

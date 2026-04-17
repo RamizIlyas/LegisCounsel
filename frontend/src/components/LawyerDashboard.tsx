@@ -99,7 +99,7 @@ export function LawyerDashboard({ onNavigate, onLogout, onRoleSwitch }: LawyerDa
 
   return (
     <DashboardLayout
-      userRole="Lawyer"
+      userRole="lawyer"
       currentPage="dashboard"
       onNavigate={onNavigate}
       onLogout={onLogout}

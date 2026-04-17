@@ -38,7 +38,7 @@ export function ManagementPanel({ onNavigate, onLogout }: ManagementProps) {
 
   return (
     <DashboardLayout
-      userRole="Admin"
+      userRole="admin"
       currentPage="management"
       onNavigate={onNavigate}
       onLogout={onLogout}

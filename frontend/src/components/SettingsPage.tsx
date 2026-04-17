@@ -38,11 +38,11 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
   const [marketingEmails, setMarketingEmails] = useState(false);
 
   const [profileData, setProfileData] = useState({
-    name: userRole === 'Lawyer' ? 'John Doe' : userRole === 'Client' ? 'Alice Client' : 'Admin User',
-    email: userRole === 'Lawyer' ? 'john.doe@law.com' : 'alice@email.com',
+    name: userRole === 'lawyer' ? 'John Doe' : userRole === 'client' ? 'Alice Client' : 'Admin User',
+    email: userRole === 'lawyer' ? 'john.doe@law.com' : 'alice@email.com',
     phone: '+1 (555) 123-4567',
     location: 'New York, NY',
-    organization: userRole === 'Lawyer' ? 'Doe & Associates Law Firm' : 'N/A'
+    organization: userRole === 'lawyer' ? 'Doe & Associates Law Firm' : 'N/A'
   });
 
   const handleSaveProfile = () => {
@@ -91,7 +91,7 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                 <div className="flex items-center gap-6">
                   <Avatar className="h-24 w-24">
                     <AvatarFallback className="bg-[#1E3A8A] text-white text-2xl">
-                      {userRole === 'Lawyer' ? 'LA' : userRole === 'Client' ? 'RC' : 'AD'}
+                      {userRole === 'lawyer' ? 'LA' : userRole === 'client' ? 'RC' : 'AD'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="space-y-2">
@@ -159,7 +159,7 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                     </div>
                   </div>
 
-                  {userRole === 'Lawyer' && (
+                  {userRole === 'lawyer' && (
                     <div className="space-y-2">
                       <Label htmlFor="organization">Law Firm / Organization</Label>
                       <div className="relative">
@@ -336,7 +336,7 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                   />
                 </div>
 
-                {userRole !== 'Admin' && onRoleSwitch && (
+                {userRole !== 'admin' && onRoleSwitch && (
                   <>
                     <Separator />
 
@@ -350,7 +350,7 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                         onClick={onRoleSwitch}
                         className="border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A]/10"
                       >
-                        Switch to {userRole === 'Lawyer' ? 'Client' : 'Lawyer'} View
+                        Switch to {userRole === 'lawyer' ? 'client' : 'lawyer'} View
                       </Button>
                     </div>
                   </>

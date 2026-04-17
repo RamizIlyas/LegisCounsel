@@ -1,3 +1,5 @@
+To Run Rag Service :
+uvicorn app:app --reload --port 8001
 # LegisCounsel
 
 LegisCounsel is a project designed to assist with legal document analysis and legislative research. It provides tools and resources to help users navigate complex legal texts, understand legislative frameworks, and access counsel-related information efficiently.

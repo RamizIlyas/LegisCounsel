@@ -52,7 +52,7 @@ const accuracyData = [
 export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
   return (
     <DashboardLayout
-      userRole="Admin"
+      userRole="admin"
       currentPage="admin"
       onNavigate={onNavigate}
       onLogout={onLogout}

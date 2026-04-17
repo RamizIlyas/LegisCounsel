@@ -12,7 +12,7 @@ import { SignupPage } from './components/SignupPage';
 import { ManagementPanel } from './components/ManagementPanel';
 import {useAuth} from './contexts/AuthContext';
 
-export type UserRole = 'Lawyer' | 'Client' | 'Admin' | null;
+export type UserRole = 'lawyer' | 'client' | 'admin' | null;
 
 export type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'cases' | 'communication' | 'admin' | 'management'| 'settings';
 
@@ -52,10 +52,10 @@ export default function App() {
   };
 
   const handleRoleSwitch = () => {
-    if (userRole === 'Lawyer') {
-      setUserRole('Client');
-    } else if (userRole === 'Client') {
-      setUserRole('Lawyer');
+    if (userRole === 'lawyer') {
+      setUserRole('client');
+    } else if (userRole === 'client') {
+      setUserRole('lawyer');
     }
   };
 
@@ -68,10 +68,10 @@ export default function App() {
       case 'signup':
         return <SignupPage onLogin={handleLogin} onNavigate={handleNavigation} />;
       case 'dashboard':
-        if (userRole === 'Admin') {
+        if (userRole === 'admin') {
           return <AdminPanel onNavigate={handleNavigation} onLogout={handleLogout} />;
         }
-        return userRole === 'Lawyer' 
+        return userRole === 'lawyer' 
           ? <LawyerDashboard onNavigate={handleNavigation} onLogout={handleLogout} onRoleSwitch={handleRoleSwitch} />
           : <ClientDashboard onNavigate={handleNavigation} onLogout={handleLogout} onRoleSwitch={handleRoleSwitch} />;
       case 'cases':

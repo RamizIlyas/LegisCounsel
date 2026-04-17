@@ -163,7 +163,7 @@ export function CaseManagement({
   }, [editingCase]);
 
   useEffect(() => {
-    console.log("Fetching cases with user:", user);
+    // console.log("Fetching cases with user:", user);
     fetchCases();
   }, []);
 
@@ -284,7 +284,7 @@ export function CaseManagement({
   const handleDeleteCase = async (id: string) => {
     try {
       const token = localStorage.getItem("token");
-      console.log("Token for deletion:", token);
+      // console.log("Token for deletion:", token);
       await axios.delete(`${BACKEND_API_URL}/api/cases/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,

@@ -16,7 +16,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
+const BACKEND_API_URL =
+  import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
 
 interface Message {
   id: string;
@@ -72,6 +73,7 @@ export function AiChatInterface({
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const { user } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   // const menuRef = useRef<HTMLDivElement | null>(null);
   // Close 3-dot menu when clicking outside
   useEffect(() => {
@@ -228,7 +230,6 @@ export function AiChatInterface({
     await loadConversations();
   };
 
-
   // const generateAIResponse = (question: string): string => {
   //   if (
   //     question.toLowerCase().includes("tenant") ||
@@ -246,7 +247,9 @@ export function AiChatInterface({
         <Card className="h-[calc(100vh-7rem)] overflow-hidden">
           <div className="flex h-full">
             {/* LEFT: Conversations Sidebar */}
-            <div className="w-64 border-r bg-[#F8FAFC] flex flex-col h-full">
+            <div className="hidden md:flex md:w-56 lg:w-64 border-r bg-[#F8FAFC] flex-col h-full">
+              {/* w-full max-w-64 border-r bg-[#F8FAFC] flex flex-col h-full */}
+              {/* <div className="hidden md:flex md:w-56 lg:w-64 border-r bg-[#F8FAFC] flex-col h-full"> */}
               <div className="p-3">
                 <Button
                   className="w-full bg-[#1E3A8A] text-white"
@@ -269,43 +272,44 @@ export function AiChatInterface({
                       }`}
                     >
                       {/* LEFT : 3-dot menu */}
-                    <div className="relative flex items-center">
                       <div className="relative flex items-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveMenu(
-                              activeMenu === chat._id ? null : chat._id,
-                            );
-                          }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-300"
-                        >
-                          ⋮
-                        </button>
-                        {activeMenu === chat._id && (
-                          <div 
-                          onClick={(e)=> e.stopPropagation()}
-                          className="absolute left-0 top-8 w-32 bg-white border rounded-md shadow z-10">
-                            <button
-                              className="block w-full text-left px-3 py-2 text-black hover:bg-gray-100"
-                              onClick={() => {
-                                setEditingChatId(chat._id);
-                                setNewTitle(chat.title || "");
-                                setActiveMenu(null);
-                              }}
+                        <div className="relative flex items-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenu(
+                                activeMenu === chat._id ? null : chat._id,
+                              );
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-300"
+                          >
+                            ⋮
+                          </button>
+                          {activeMenu === chat._id && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute left-0 top-8 w-32 bg-white border rounded-md shadow z-10"
                             >
-                              Rename
-                            </button>
+                              <button
+                                className="block w-full text-left px-3 py-2 text-black hover:bg-gray-100"
+                                onClick={() => {
+                                  setEditingChatId(chat._id);
+                                  setNewTitle(chat.title || "");
+                                  setActiveMenu(null);
+                                }}
+                              >
+                                Rename
+                              </button>
 
-                            <button
-                              className="block w-full text-left px-3 py-2 hover:bg-red-100 text-red-600"
-                              onClick={() => deleteConversation(chat._id)}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                              <button
+                                className="block w-full text-left px-3 py-2 hover:bg-red-100 text-red-600"
+                                onClick={() => deleteConversation(chat._id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       {/* LEFT: Title or Input */}
                       <div
@@ -338,6 +342,13 @@ export function AiChatInterface({
               {/* HEADER */}
               <CardHeader className="border-b bg-gradient-to-r from-[#1E3A8A] to-[#1E3A8A]/80">
                 <div className="flex items-center gap-3">
+                  <Button
+                  variant="ghost"
+                  className="md:hidden text-white"
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  ☰
+                </Button>
                   <div className="w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center">
                     <Bot className="h-6 w-6 text-white" />
                   </div>
@@ -345,9 +356,10 @@ export function AiChatInterface({
                     <CardTitle className="text-white">
                       AI Legal Assistant
                     </CardTitle>
-                    <p className="text-sm text-white/80">
+                    {/* {(<p className="text-sm text-white/80">
                       Ask your legal questions in simple language
-                    </p>
+                    </p>) */}
+
                   </div>
                   <Badge className="bg-white/20 text-white border-white/30">
                     {user?.role} View
@@ -389,7 +401,7 @@ export function AiChatInterface({
                             </p>
                           </div>
                           {message.references && (
-                            <div className="mt-2 space-y-2">
+                            <div className="mt-1 space-y-1">
                               <p className="text-xs text-gray-500 flex items-center gap-1">
                                 <FileText className="h-3 w-3" />
                                 Legal References:
@@ -399,8 +411,8 @@ export function AiChatInterface({
                                   key={idx}
                                   className="border-l-4 border-l-[#D4AF37]"
                                 >
-                                  <CardContent className="p-3">
-                                    <p className="text-sm">{ref.title}</p>
+                                  <CardContent className="p-1">
+                                    <p className="text-xs">{ref.title}</p>
                                     <p className="text-xs text-gray-500">
                                       {ref.citation}
                                     </p>
@@ -460,6 +472,49 @@ export function AiChatInterface({
                   </div>
                 </div>
               </CardContent>
+              {//Mobile Sidebar Overlay
+              sidebarOpen && (
+              <div className="fixed inset-0 z-50 flex">
+                {/* Overlay */}
+                <div
+                  className="absolute inset-0 bg-black/50"
+                  onClick={() => setSidebarOpen(false)}
+                />
+
+                {/* Sidebar */}
+                <div className="relative w-64 bg-[#F8FAFC] h-full flex flex-col shadow-lg">
+                  <div className="p-3 flex justify-between items-center">
+                    <Button
+                      className="w-[calc(100%-1rem)] bg-[#1E3A8A] text-white"
+                      onClick={createNewChat}
+                    >
+                      + New Chat
+                    </Button>
+                    <button
+                      onClick={() => setSidebarOpen(false)}
+                      className="ml-2 text-xl"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <ScrollArea className="flex-1 px-2 overflow-y-auto">
+                    {conversations.map((chat) => (
+                      <div
+                        key={chat._id}
+                        onClick={() => {
+                          loadMessages(chat._id);
+                          setSidebarOpen(false);
+                        }}
+                        className="px-3 py-2 mb-2 rounded-full cursor-pointer hover:bg-gray-200"
+                      >
+                        {chat.title || "New Chat"}
+                      </div>
+                    ))}
+                  </ScrollArea>
+                </div>
+              </div>
+            )}
             </div>
           </div>
         </Card>

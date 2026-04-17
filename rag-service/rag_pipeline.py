@@ -39,17 +39,19 @@ class LocalRAG:
         self.ollama_url = "http://localhost:11434/api/generate"
         self.model = "qwen2.5:3b"   # llama3 or mistral(Fast)
         # self.judge_model = "llama3.2:3b"  # For evaluation (Llama 3 is better at scoring as it is strict)
-
-        # Warm up the model with a dummy request to reduce latency on first real query
-        print("🔥 Warming up model...")
-        requests.post(
-            self.ollama_url,
-            json={
-                "model": self.model,
-                "prompt": "Hello",
-                "stream": False
-            }
-        )
+        try:
+            # Warm up the model with a dummy request to reduce latency on first real query
+            print("🔥 Warming up model...")
+            requests.post(
+                self.ollama_url,
+                json={
+                    "model": self.model,
+                    "prompt": "Hello",
+                    "stream": False
+                }
+            )
+        except Exception as e:
+            print(f"⚠️ Warning: Could not connect to Ollama at {self.ollama_url}. Make sure Ollama is running. Error: {e}")
 
     # Retrieve relevant documents from ChromaDB based on query
     def retrieve(self, query, k=3):

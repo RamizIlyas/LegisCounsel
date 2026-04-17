@@ -671,11 +671,11 @@ export function Communication({
                       )}
                       <div className="space-y-4">
                         {messages.map((msg) => {
-                          const isMe = msg.sender._id === currentUser._id;
+                          const isMe = msg.sender._id === currentUser.id;                          
                           return (
                             <div
                               key={msg._id}
-                              className={`flex gap-3 ${isMe ? "justify-end" : "justify-start"}`}
+                              className={`flex gap-3 ${isMe ? "justify-end " : "justify-start"}`}
                             >
                               {!isMe && (
                                 <Avatar className="h-8 w-8 flex-shrink-0">
