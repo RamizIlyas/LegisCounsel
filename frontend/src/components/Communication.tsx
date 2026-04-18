@@ -671,7 +671,7 @@ export function Communication({
                       )}
                       <div className="space-y-4">
                         {messages.map((msg) => {
-                          const isMe = msg.sender._id === currentUser.id;                          
+                          const isMe = msg.sender._id === currentUserId;                          
                           return (
                             <div
                               key={msg._id}
