@@ -1,257 +1,332 @@
 # rag_pipeline.py
-# RAG Pipeline for Pakistan Penal Code Legal Assistant
-# This code sets up a Retrieval-Augmented Generation (RAG) system using ChromaDB for vector storage and Ollama for LLM generation.
-# It includes methods for preparing documents, retrieving relevant sections, building prompts, generating answers
-# and rewriting follow-up questions to be self-contained.
+# RAG Pipeline for Pakistan Legal Assistant
+# Retrieves relevant law sections from the Penal Code vector DB
+# AND relevant case judgements from the cases vector DB,
+# then combines both into a single grounded LLM prompt.
 
-# from urllib import response
 import chromadb
 from chromadb.utils import embedding_functions
 import requests
-# from sentence_transformers import util #, SentenceTransformer 
 
-###Old Scoring Method using Sentence Transformers 
-# - Not used as it is not strict and can give high scores to partially correct answers
-
-# scoring_model = SentenceTransformer("all-MiniLM-L6-v2")
-# Simple cosine similarity scoring function to SCore Model Output against Ground Truth
-# def score_answer(predicted, ground_truth):
-#     emb1 = scoring_model.encode(predicted, convert_to_tensor=True)
-#     emb2 = scoring_model.encode(ground_truth, convert_to_tensor=True)
-#     similarity = util.cos_sim(emb1, emb2).item()
-#     return round(similarity * 100, 2)
-
-
-# Use SAME embedding function as your DB
+# ── Shared embedding function (loaded ONCE for both collections) ──────────────
+print("🔄 Loading embedding model …")
 embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
     model_name="BAAI/bge-base-en-v1.5",
     normalize_embeddings=True
 )
+print("✅ Embedding model ready.")
 
 
 class LocalRAG:
-    # Initialize ChromaDB client and set up collection
-    def __init__(self):
-        print("🚀 Initializing RAG pipeline...")
+    def __init__(
+        self,
+        laws_db_path:  str = "./law_vector_db",
+        cases_db_path: str = "./cases_vector_db",
+        ollama_model:  str = "qwen2.5:3b",
+        laws_k:        int = 3,   # law sections to retrieve
+        cases_k:       int = 3,   # case judgements to retrieve
+    ):
+        print("🚀 Initializing RAG pipeline …")
 
-        self.chroma_client = chromadb.PersistentClient(path="./law_vector_db")
+        self.laws_k  = laws_k
+        self.cases_k = cases_k
 
-        self.collection = self.chroma_client.get_collection(
+        # ── Laws ChromaDB ─────────────────────────────────────────────────────
+        print(f"  📖 Loading laws DB from '{laws_db_path}' …")
+        laws_client = chromadb.PersistentClient(path=laws_db_path)
+        self.laws_collection = laws_client.get_collection(
             name="pakistan_penal_code",
-            embedding_function=embedding_function
+            embedding_function=embedding_function,
         )
+        print(f"     ✓ {self.laws_collection.count()} law chunks loaded.")
 
-        # Ollama endpoint
+        # ── Cases ChromaDB ────────────────────────────────────────────────────
+        print(f"  ⚖️  Loading cases DB from '{cases_db_path}' …")
+        cases_client = chromadb.PersistentClient(path=cases_db_path)
+        self.cases_collection = cases_client.get_collection(
+            name="pakistan_law_cases",
+            embedding_function=embedding_function,
+        )
+        print(f"     ✓ {self.cases_collection.count()} case chunks loaded.")
+
+        # ── Ollama ────────────────────────────────────────────────────────────
         self.ollama_url = "http://localhost:11434/api/generate"
-        self.model = "qwen2.5:3b"   # llama3 or mistral(Fast)
-        # self.judge_model = "llama3.2:3b"  # For evaluation (Llama 3 is better at scoring as it is strict)
+        self.model      = ollama_model
+
+        print("🔥 Warming up LLM …")
         try:
-            # Warm up the model with a dummy request to reduce latency on first real query
-            print("🔥 Warming up model...")
             requests.post(
                 self.ollama_url,
-                json={
-                    "model": self.model,
-                    "prompt": "Hello",
-                    "stream": False
-                }
+                json={"model": self.model, "prompt": "Hello", "stream": False},
+                timeout=30,
             )
+            print("  ✓ LLM ready.")
         except Exception as e:
-            print(f"⚠️ Warning: Could not connect to Ollama at {self.ollama_url}. Make sure Ollama is running. Error: {e}")
+            print(f"  ⚠️  Could not reach Ollama ({e}). Make sure it is running.")
 
-    # Retrieve relevant documents from ChromaDB based on query
-    def retrieve(self, query, k=3):
-        results = self.collection.query(
+        print("✅ RAG pipeline ready.\n")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Retrieval
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def retrieve_laws(self, query: str) -> tuple[list[str], list[dict]]:
+        """Retrieve relevant PPC sections from the laws vector DB."""
+        res = self.laws_collection.query(
             query_texts=[query],
-            n_results=k
+            n_results=self.laws_k,
         )
-        return results["documents"][0], results["metadatas"][0]
-    
-    # Build prompt for LLM generation using retrieved documents and query
-    def build_prompt(self, query, docs, history=None, metas=None):
-        context = "\n\n".join(docs)
-        # Include conversation history in the prompt 
-        # to provide context for follow-up questions, 
-        # but limit to last 5 messages to avoid overwhelming the model.
-        # Clearly label user and assistant messages.
+        return res["documents"][0], res["metadatas"][0]
+
+    def retrieve_cases(
+        self,
+        query:      str,
+        chunk_type: str = None,   # "summary" | "headnote" | "judgment" | None
+        section:    str = None,   # e.g. "302" to filter by primary_sections
+        outcome:    str = None,   # e.g. "Acquitted"
+    ) -> tuple[list[str], list[dict]]:
+        """
+        Retrieve relevant judgement chunks from the cases vector DB.
+        Prefer summary + headnote chunks for concise case overviews;
+        fall back to all chunk types if filtered results are insufficient.
+        """
+        where = {}
+        if chunk_type:
+            where["chunk_type"] = {"$eq": chunk_type}
+        if outcome:
+            where["outcome"] = {"$eq": outcome}
+        if section:
+            where["primary_sections"] = {"$contains": section}
+
+        kwargs = dict(query_texts=[query], n_results=self.cases_k)
+        if where:
+            kwargs["where"] = (
+                where if len(where) == 1
+                else {"$and": [{k: v} for k, v in where.items()]}
+            )
+
+        try:
+            res = self.cases_collection.query(**kwargs)
+            docs  = res["documents"][0]
+            metas = res["metadatas"][0]
+            # If filters returned nothing, retry without filters
+            if not docs and where:
+                res   = self.cases_collection.query(
+                    query_texts=[query], n_results=self.cases_k
+                )
+                docs  = res["documents"][0]
+                metas = res["metadatas"][0]
+            return docs, metas
+        except Exception as e:
+            print(f"  ⚠️  Cases retrieval error: {e}")
+            return [], []
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Prompt builder
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def build_prompt(
+        self,
+        query:      str,
+        law_docs:   list[str],
+        case_docs:  list[str],
+        law_metas:  list[dict],
+        case_metas: list[dict],
+        history:    list[dict] = None,
+    ) -> str:
+        # ── Conversation history (last 3 turns) ───────────────────────────────
         history_text = ""
         if history:
-            for msg in history[-3:]:  # last 3 messages only
+            for msg in history[-3:]:
                 role = "User" if msg["role"] == "user" else "Assistant"
                 history_text += f"{role}: {msg['content']}\n"
-        # #To add to strictness, we can instruct the model to only answer based on the context 
-        # and penalize if it uses outside knowledge. 
-        # Quote exact lines where possible.
-        # If answer is not clearly present, say "Not found in context".
-        # DO NOT use outside knowledge.
 
-        prompt = f"""You are a legal assistant for Pakistan Penal Code.
+        # ── Laws context block ─────────────────────────────────────────────────
+        law_blocks = []
+        for doc, meta in zip(law_docs, law_metas):
+            sec   = meta.get("section_number", "?")
+            title = meta.get("section_title", "")
+            law_blocks.append(f"[Section {sec} – {title}]\n{doc}")
+        laws_context = "\n\n".join(law_blocks) if law_blocks else "No relevant law sections found."
 
-                    Use ONLY the Conversation History and context below to answer the question.
-                    If the answer is not clearly in the context or conversation history, say "Not found in provided context."
-                    Do NOT guess or introduce unrelated sections.
-                    
-                    Conversation History:
-                    {history_text}
+        # ── Cases context block ────────────────────────────────────────────────
+        case_blocks = []
+        for doc, meta in zip(case_docs, case_metas):
+            citation = meta.get("citation", "Unknown")
+            court    = meta.get("court", "")
+            outcome  = meta.get("outcome", "")
+            ctype    = meta.get("chunk_type", "")
+            header   = f"[{citation} | {court} | Outcome: {outcome} | {ctype}]"
+            case_blocks.append(f"{header}\n{doc}")
+        cases_context = "\n\n".join(case_blocks) if case_blocks else "No relevant cases found."
 
-                    Context:
-                    {context}
+        prompt = f"""You are an expert legal assistant specialising in Pakistani law.
 
-                    Question:
-                    {query}
+Use ONLY the information in the sections below to answer the question.
+If the answer is not present in the provided context or conversation history,
+say "Not found in provided context." Do NOT guess or introduce outside information.
 
-                    Answer clearly with section references AND detailed explanation in simple words.
-                    """
+============================
+CONVERSATION HISTORY
+============================
+{history_text if history_text else "(none)"}
+
+============================
+RELEVANT LAW SECTIONS (Pakistan Penal Code / CrPC)
+============================
+{laws_context}
+
+============================
+RELEVANT CASE JUDGEMENTS
+============================
+{cases_context}
+
+============================
+QUESTION
+============================
+{query}
+
+============================
+INSTRUCTIONS
+============================
+- Cite the specific law section(s) that apply (e.g. "Section 302 PPC").
+- Reference at least one case judgement if relevant, quoting the citation and outcome.
+- Explain in clear, simple language what the law says and how the courts have interpreted it.
+- If the cases show conflicting outcomes, mention both and explain the distinction.
+- Keep your answer structured: Law → Case precedent → Plain-language conclusion.
+
+Answer:"""
+
         return prompt
 
-    # Generate answer using Mistral(Model is Mistral, Judge is Llama 3) LLM based on the built prompt
-    def generate(self, prompt):
+    # ─────────────────────────────────────────────────────────────────────────
+    # LLM generation
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def generate(self, prompt: str) -> str:
         response = requests.post(
             self.ollama_url,
-            json={
-                "model": self.model,
-                "prompt": prompt,
-                "stream": False
-            }
+            json={"model": self.model, "prompt": prompt, "stream": False},
+            timeout=120,
         )
-
+        # print("\nDEBUG RESPONSE:")
+        # print(response.json())
         return response.json()["response"]
-    
-    ## Judge the generated answer against the ground truth using LLM
-    ## , providing a score and feedback based on strict criteria
 
-    # def judge_answer(self, question, answer, context, ground_truth):
-    #     judge_prompt = f"""You are a STRICT legal evaluator.
+    # ─────────────────────────────────────────────────────────────────────────
+    # Query rewriting for follow-up questions
+    # ─────────────────────────────────────────────────────────────────────────
 
-    #     Evaluate ONLY using the context.
-
-    #     Question:
-    #     {question}
-
-    #     Context:
-    #     {context}
-
-    #     Model Answer:
-    #     {answer}
-
-    #     Expected Answer:
-    #     {ground_truth}
-
-    #     Rules:
-    #     - Penalize hallucinations
-    #     - Penalize missing details
-    #     - Be strict
-
-    #     Output EXACTLY in this format (no % sign):
-
-    #     Score: <number>
-    #     Faithful: <Yes/No>
-    #     Correct: <Yes/Partial/No>
-    #     Reason: <short>
-    #     """
-    #     response = requests.post(
-    #         self.ollama_url,
-    #         json={
-    #             "model": self.judge_model,
-    #             "prompt": judge_prompt,
-    #             "stream": False
-    #         }
-    #     )
-
-    #     return response.json()["response"]
-    
-    ## Verify if the generated answer is fully supported by the retrieved context using LLM
-    # def verify_answer(self, answer, context):
-    #     prompt = f"""Check if the answer is fully supported by the context.
-
-    #     Answer:
-    #     {answer}
-
-    #     Context:
-    #     {context}
-
-    #     Reply ONLY:
-    #     Supported: Yes/No
-    #     """
-
-    #     response = requests.post(
-    #         self.ollama_url,
-    #         json={
-    #             "model": self.judge_model,
-    #             "prompt": prompt,
-    #             "stream": False
-    #         }
-    #     )
-
-    #     return response.json()["response"]
-    
-    ## Rewrite follow-up questions to be self-contained using LLM, 
-    ## incorporating relevant conversation history to provide necessary context for accurate retrieval and answer generation.
-    def rewrite_query(self, query, history):
+    def rewrite_query(self, query: str, history: list[dict]) -> str:
+        """Rewrite a follow-up question to be fully self-contained."""
         if not history:
             return query
-        print("\n🔄 Rewriting query to be self-contained using conversation history...")
+
+        print("🔄 Rewriting follow-up query …")
         history_text = ""
-        for msg in history[-3:]:  # last 3 messages
+        for msg in history[-3:]:
             role = "User" if msg["role"] == "user" else "Assistant"
             history_text += f"{role}: {msg['content']}\n"
 
-        prompt = f"""Rewrite the user's question to be fully self-contained.
-                you dont alwasys have to use the entire conversation history, only use relevant parts.
+        prompt = f"""Rewrite the user's follow-up question as a fully self-contained question.
+Only include context from the conversation that is directly relevant.
 
-                Conversation:
-                {history_text}
+Conversation:
+{history_text}
 
-                Follow-up Question:
-                {query}
+Follow-up Question:
+{query}
 
-                Rewritten standalone question:
-                """
+Rewritten standalone question:"""
 
         response = requests.post(
             self.ollama_url,
-            json={
-                "model": self.model, 
-                "prompt": prompt,
-                "stream": False
-            }
+            json={"model": self.model, "prompt": prompt, "stream": False},
+            timeout=60,
+        )
+        rewritten = response.json()["response"].strip()
+        print(f"   → {rewritten}")
+        return rewritten
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Main entry point
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def ask(
+        self,
+        query:        str,
+        history:      list[dict] = None,
+        # Optional case filters — pass these for more targeted case retrieval
+        case_section: str = None,   # e.g. "302"
+        case_outcome: str = None,   # e.g. "Acquitted"
+        case_chunk_type: str = None,  # "summary" | "headnote" | "judgment"
+    ) -> str:
+        # ── 1. Rewrite query if this is a follow-up ───────────────────────────
+        retrieval_query = (
+            self.rewrite_query(query, history) if history else query
         )
 
-        return response.json()["response"].strip()
+        # ── 2. Retrieve from BOTH vector DBs ──────────────────────────────────
+        print(f"\n🔍 Retrieving laws for: \"{retrieval_query[:80]}\"")
+        law_docs, law_metas = self.retrieve_laws(retrieval_query)
+        print(f"   ✓ {len(law_docs)} law section(s) retrieved.")
+        for m in law_metas:
+            print(f"     • Section {m.get('section_number','?')} – {m.get('section_title','')}")
 
+        print(f"\n⚖️  Retrieving cases for: \"{retrieval_query[:80]}\"")
+        case_docs, case_metas = self.retrieve_cases(
+            retrieval_query,
+            chunk_type=case_chunk_type,
+            section=case_section,
+            outcome=case_outcome,
+        )
+        print(f"   ✓ {len(case_docs)} case chunk(s) retrieved.")
+        for m in case_metas:
+            print(f"     • {m.get('citation','?')} | {m.get('court','?')} | {m.get('outcome','?')} [{m.get('chunk_type','?')}]")
 
-    # Main method to ask a question, retrieve context, generate answer, and print results
-    def ask(self, query, docs=None, metas=None, history=None):
-        # if docs is None:
-        #     docs, metas = self.retrieve(query)
-        
-        ## Rewrite query to be self-contained 
-        ## if there is conversation history,
-        if not history:
-            rewritten_query = query
-        else:
-            rewritten_query = self.rewrite_query(query, history)
-            print(f"\n🔄 Rewritten Query:\n{rewritten_query}")
-            
-
-        docs, metas = self.retrieve(rewritten_query)
-
-
-        # Print retrieved context for debugging and transparency
-        print("\n📚 Retrieved Context:")
-        for m in metas[:3]:
-            print(f"   Section {m['section_number']} - {m['section_title']}")
-
-        prompt = self.build_prompt(rewritten_query, docs, history,metas)
+        # ── 3. Build prompt & generate answer ─────────────────────────────────
+        print("\n💬 Generating answer …")
+        prompt = self.build_prompt(
+            query       = retrieval_query,
+            law_docs    = law_docs,
+            case_docs   = case_docs,
+            law_metas   = law_metas,
+            case_metas  = case_metas,
+            history     = history,
+        )
         answer = self.generate(prompt)
-
         return answer
-        
-        
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Quick interactive demo
+# ─────────────────────────────────────────────────────────────────────────────
 
-        ## If docs are already provided (from a previous retrieval),
-        ## it uses them directly. 
-        ## This allows for more efficient follow-up questions 
-        ## without needing to retrieve again.
+if __name__ == "__main__":
+    rag = LocalRAG()
+    history = []
+
+    print("Pakistan Legal Assistant (type 'quit' to exit)\n")
+    print("─" * 60)
+
+    while True:
+        try:
+            query = input("\n🧑 You: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nGoodbye.")
+            break
+
+        if not query:
+            continue
+        if query.lower() in ("quit", "exit", "q"):
+            print("Goodbye.")
+            break
+
+        answer = rag.ask(query, history=history if history else None)
+
+        print(f"\n🤖 Assistant:\n{answer}")
+        print("─" * 60)
+
+        # Update conversation history
+        history.append({"role": "user",      "content": query})
+        history.append({"role": "assistant", "content": answer})
