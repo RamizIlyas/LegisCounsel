@@ -3,6 +3,7 @@
 # Retrieves relevant law sections from the Penal Code vector DB
 # AND relevant case judgements from the cases vector DB,
 # then combines both into a single grounded LLM prompt.
+# ask() now returns a structured dict with answer + law_sources + case_sources.
 
 import chromadb
 from chromadb.utils import embedding_functions
@@ -23,8 +24,8 @@ class LocalRAG:
         laws_db_path:  str = "./law_vector_db",
         cases_db_path: str = "./cases_vector_db",
         ollama_model:  str = "qwen2.5:3b",
-        laws_k:        int = 3,   # law sections to retrieve
-        cases_k:       int = 3,   # case judgements to retrieve
+        laws_k:        int = 3,
+        cases_k:       int = 3,
     ):
         print("🚀 Initializing RAG pipeline …")
 
@@ -71,7 +72,6 @@ class LocalRAG:
     # ─────────────────────────────────────────────────────────────────────────
 
     def retrieve_laws(self, query: str) -> tuple[list[str], list[dict]]:
-        """Retrieve relevant PPC sections from the laws vector DB."""
         res = self.laws_collection.query(
             query_texts=[query],
             n_results=self.laws_k,
@@ -81,15 +81,10 @@ class LocalRAG:
     def retrieve_cases(
         self,
         query:      str,
-        chunk_type: str = None,   # "summary" | "headnote" | "judgment" | None
-        section:    str = None,   # e.g. "302" to filter by primary_sections
-        outcome:    str = None,   # e.g. "Acquitted"
+        chunk_type: str = None,
+        section:    str = None,
+        outcome:    str = None,
     ) -> tuple[list[str], list[dict]]:
-        """
-        Retrieve relevant judgement chunks from the cases vector DB.
-        Prefer summary + headnote chunks for concise case overviews;
-        fall back to all chunk types if filtered results are insufficient.
-        """
         where = {}
         if chunk_type:
             where["chunk_type"] = {"$eq": chunk_type}
@@ -106,11 +101,10 @@ class LocalRAG:
             )
 
         try:
-            res = self.cases_collection.query(**kwargs)
+            res   = self.cases_collection.query(**kwargs)
             docs  = res["documents"][0]
             metas = res["metadatas"][0]
-            # If filters returned nothing, retry without filters
-            if not docs and where:
+            if not docs and where:           # retry without filters
                 res   = self.cases_collection.query(
                     query_texts=[query], n_results=self.cases_k
                 )
@@ -134,14 +128,12 @@ class LocalRAG:
         case_metas: list[dict],
         history:    list[dict] = None,
     ) -> str:
-        # ── Conversation history (last 3 turns) ───────────────────────────────
         history_text = ""
         if history:
             for msg in history[-3:]:
                 role = "User" if msg["role"] == "user" else "Assistant"
                 history_text += f"{role}: {msg['content']}\n"
 
-        # ── Laws context block ─────────────────────────────────────────────────
         law_blocks = []
         for doc, meta in zip(law_docs, law_metas):
             sec   = meta.get("section_number", "?")
@@ -149,7 +141,6 @@ class LocalRAG:
             law_blocks.append(f"[Section {sec} – {title}]\n{doc}")
         laws_context = "\n\n".join(law_blocks) if law_blocks else "No relevant law sections found."
 
-        # ── Cases context block ────────────────────────────────────────────────
         case_blocks = []
         for doc, meta in zip(case_docs, case_metas):
             citation = meta.get("citation", "Unknown")
@@ -196,7 +187,6 @@ INSTRUCTIONS
 - Keep your answer structured: Law → Case precedent → Plain-language conclusion.
 
 Answer:"""
-
         return prompt
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -209,16 +199,13 @@ Answer:"""
             json={"model": self.model, "prompt": prompt, "stream": False},
             timeout=120,
         )
-        # print("\nDEBUG RESPONSE:")
-        # print(response.json())
         return response.json()["response"]
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Query rewriting for follow-up questions
+    # Query rewriting
     # ─────────────────────────────────────────────────────────────────────────
 
     def rewrite_query(self, query: str, history: list[dict]) -> str:
-        """Rewrite a follow-up question to be fully self-contained."""
         if not history:
             return query
 
@@ -250,23 +237,31 @@ Rewritten standalone question:"""
 
     # ─────────────────────────────────────────────────────────────────────────
     # Main entry point
+    # Returns a structured dict so the backend can forward sources to the UI.
     # ─────────────────────────────────────────────────────────────────────────
 
     def ask(
         self,
-        query:        str,
-        history:      list[dict] = None,
-        # Optional case filters — pass these for more targeted case retrieval
-        case_section: str = None,   # e.g. "302"
-        case_outcome: str = None,   # e.g. "Acquitted"
-        case_chunk_type: str = None,  # "summary" | "headnote" | "judgment"
-    ) -> str:
-        # ── 1. Rewrite query if this is a follow-up ───────────────────────────
+        query:           str,
+        history:         list[dict] = None,
+        case_section:    str = None,
+        case_outcome:    str = None,
+        case_chunk_type: str = None,
+    ) -> dict:
+        """
+        Returns:
+        {
+            "answer":       str,
+            "law_sources":  [ { type, section_number, section_title, chapter }, ... ],
+            "case_sources": [ { type, citation, court, outcome, sections },     ... ]
+        }
+        """
+        # 1. Rewrite if follow-up
         retrieval_query = (
             self.rewrite_query(query, history) if history else query
         )
 
-        # ── 2. Retrieve from BOTH vector DBs ──────────────────────────────────
+        # 2. Retrieve from both DBs
         print(f"\n🔍 Retrieving laws for: \"{retrieval_query[:80]}\"")
         law_docs, law_metas = self.retrieve_laws(retrieval_query)
         print(f"   ✓ {len(law_docs)} law section(s) retrieved.")
@@ -284,18 +279,53 @@ Rewritten standalone question:"""
         for m in case_metas:
             print(f"     • {m.get('citation','?')} | {m.get('court','?')} | {m.get('outcome','?')} [{m.get('chunk_type','?')}]")
 
-        # ── 3. Build prompt & generate answer ─────────────────────────────────
+        # 3. Build prompt and generate answer
         print("\n💬 Generating answer …")
         prompt = self.build_prompt(
-            query       = retrieval_query,
-            law_docs    = law_docs,
-            case_docs   = case_docs,
-            law_metas   = law_metas,
-            case_metas  = case_metas,
-            history     = history,
+            query      = retrieval_query,
+            law_docs   = law_docs,
+            case_docs  = case_docs,
+            law_metas  = law_metas,
+            case_metas = case_metas,
+            history    = history,
         )
         answer = self.generate(prompt)
-        return answer
+
+        # 4. Deduplicate and structure sources for the frontend
+        # ── Law sources ───────────────────────────────────────────────────────
+        seen_sections = set()
+        law_sources   = []
+        for m in law_metas:
+            sec = m.get("section_number", "")
+            if sec and sec not in seen_sections:
+                seen_sections.add(sec)
+                law_sources.append({
+                    "type":           "law",
+                    "section_number": sec,
+                    "section_title":  m.get("section_title", ""),
+                    "chapter":        m.get("chapter", ""),
+                })
+
+        # ── Case sources (one entry per unique citation) ───────────────────────
+        seen_citations = set()
+        case_sources   = []
+        for m in case_metas:
+            citation = m.get("citation", "")
+            if citation and citation not in seen_citations:
+                seen_citations.add(citation)
+                case_sources.append({
+                    "type":     "case",
+                    "citation": citation,
+                    "court":    m.get("court", ""),
+                    "outcome":  m.get("outcome", ""),
+                    "sections": m.get("primary_sections", ""),
+                })
+
+        return {
+            "answer":       answer,
+            "law_sources":  law_sources,
+            "case_sources": case_sources,
+        }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -303,7 +333,7 @@ Rewritten standalone question:"""
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    rag = LocalRAG()
+    rag     = LocalRAG()
     history = []
 
     print("Pakistan Legal Assistant (type 'quit' to exit)\n")
@@ -322,11 +352,12 @@ if __name__ == "__main__":
             print("Goodbye.")
             break
 
-        answer = rag.ask(query, history=history if history else None)
+        result = rag.ask(query, history=history if history else None)
 
-        print(f"\n🤖 Assistant:\n{answer}")
+        print(f"\n🤖 Assistant:\n{result['answer']}")
+        print(f"\n📖 Law refs : {[s['section_number'] for s in result['law_sources']]}")
+        print(f"⚖️  Case refs: {[s['citation'] for s in result['case_sources']]}")
         print("─" * 60)
 
-        # Update conversation history
         history.append({"role": "user",      "content": query})
-        history.append({"role": "assistant", "content": answer})
+        history.append({"role": "assistant", "content": result["answer"]})

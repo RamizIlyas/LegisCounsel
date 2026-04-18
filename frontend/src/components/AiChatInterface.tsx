@@ -14,17 +14,123 @@ import {
   Scale,
   MessageCircle,
   Sparkles,
+  BookOpen,
+  Gavel,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+
 const BACKEND_API_URL =
   import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface LawSource {
+  type: "law";
+  section_number: string;
+  section_title: string;
+  chapter: string;
+}
+
+interface CaseSource {
+  type: "case";
+  citation: string;
+  court: string;
+  outcome: string;
+  sections: string;
+}
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
-  references?: { title: string; citation: string }[];
+  law_sources?: LawSource[];
+  case_sources?: CaseSource[];
 }
+
+// ── Outcome badge colour helper ───────────────────────────────────────────────
+
+function outcomeColor(outcome: string): string {
+  const o = outcome.toLowerCase();
+  if (o.includes("acquit"))         return "bg-green-100 text-green-800 border-green-300";
+  if (o.includes("bail granted"))   return "bg-blue-100  text-blue-800  border-blue-300";
+  if (o.includes("bail refused"))   return "bg-red-100   text-red-800   border-red-300";
+  if (o.includes("allowed"))        return "bg-emerald-100 text-emerald-800 border-emerald-300";
+  if (o.includes("dismissed"))      return "bg-orange-100 text-orange-800 border-orange-300";
+  if (o.includes("convict"))        return "bg-red-100   text-red-800   border-red-300";
+  return "bg-gray-100 text-gray-700 border-gray-300";
+}
+
+// ── Reference panels rendered under each assistant message ───────────────────
+
+function LawReferences({ sources }: { sources: LawSource[] }) {
+  if (!sources?.length) return null;
+  return (
+    <div className="mt-2 space-y-1">
+      <p className="text-xs text-gray-500 flex items-center gap-1 font-medium">
+        <BookOpen className="h-3 w-3 text-[#1E3A8A]" />
+        Law Sections
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {sources.map((s, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-1.5 border border-[#1E3A8A]/30 bg-[#1E3A8A]/5
+                       rounded-md px-2 py-1 text-xs"
+          >
+            <span className="font-semibold text-[#1E3A8A]">§ {s.section_number}</span>
+            <span className="text-gray-600 truncate max-w-[160px]">{s.section_title}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CaseReferences({ sources }: { sources: CaseSource[] }) {
+  if (!sources?.length) return null;
+  return (
+    <div className="mt-2 space-y-1">
+      <p className="text-xs text-gray-500 flex items-center gap-1 font-medium">
+        <Gavel className="h-3 w-3 text-[#D4AF37]" />
+        Case Precedents
+      </p>
+      <div className="space-y-1">
+        {sources.map((s, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-2 border border-[#D4AF37]/40 bg-[#D4AF37]/5
+                       rounded-md px-2 py-1.5 text-xs"
+          >
+            {/* Left gold bar */}
+            <div className="w-0.5 self-stretch bg-[#D4AF37] rounded-full flex-shrink-0" />
+
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-gray-800 truncate">{s.citation}</p>
+              <p className="text-gray-500 truncate">{s.court}</p>
+            </div>
+
+            {s.outcome && (
+              <span
+                className={`flex-shrink-0 border rounded px-1.5 py-0.5 text-[10px] font-medium
+                            ${outcomeColor(s.outcome)}`}
+              >
+                {s.outcome}
+              </span>
+            )}
+
+            {s.sections && (
+              <span className="flex-shrink-0 bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 text-[10px]">
+                § {s.sections}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const initialMessages: Message[] = [
   {
@@ -42,17 +148,17 @@ const quickQuestions = [
   "Explain employment discrimination laws",
 ];
 
+// ── Auth fetch helper ─────────────────────────────────────────────────────────
+
 const authFetch = (url: string, options: any = {}) => {
   const token = localStorage.getItem("token");
-
   return fetch(url, {
     ...options,
-    headers: {
-      ...options.headers,
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { ...options.headers, Authorization: `Bearer ${token}` },
   });
 };
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 interface AiChatInterfaceProps {
   onConnectWithLawyer?: () => void;
@@ -63,77 +169,66 @@ export function AiChatInterface({
   onConnectWithLawyer,
   onRoleSwitch,
 }: AiChatInterfaceProps) {
-  // All The States
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [inputValue, setInputValue] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
+  const [messages, setMessages]           = useState<Message[]>(initialMessages);
+  const [inputValue, setInputValue]       = useState("");
+  const [isTyping, setIsTyping]           = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
-  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [activeMenu, setActiveMenu]       = useState<string | null>(null);
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
-  const [newTitle, setNewTitle] = useState("");
-  const { user } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  // const menuRef = useRef<HTMLDivElement | null>(null);
-  // Close 3-dot menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = () => {
-      setActiveMenu(null);
-    };
-
-    document.addEventListener("click", handleClickOutside);
-
-    return () => {
-      document.removeEventListener("click", handleClickOutside);
-    };
-  }, []);
+  const [newTitle, setNewTitle]           = useState("");
+  const [sidebarOpen, setSidebarOpen]     = useState(false);
+  const { user }                          = useAuth();
 
   useEffect(() => {
-    loadConversations(); // Load conversations when component mounts
+    const close = () => setActiveMenu(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
   }, []);
+
+  useEffect(() => { loadConversations(); }, []);
+
+  // ── Send message ────────────────────────────────────────────────────────────
 
   const handleSendMessage = async (messageText?: string) => {
     const text = messageText || inputValue;
     if (!text.trim()) return;
 
-    const currentConversationId = await ensureConversation(); // ✅ clean
-    // const userMessage = {
-    //   id: Date.now().toString(),
-    //   role: 'user',
-    //   content: text
-    // };
+    const currentConversationId = await ensureConversation();
+
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id:   Date.now().toString(),
       role: "user",
       content: text,
     };
-
     setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
     setIsTyping(true);
 
+    // Build history array from current messages for the backend
+    const history = messages
+      .filter((m) => m.id !== "1")   // skip the greeting
+      .map((m) => ({ role: m.role, content: m.content }));
+
     try {
       const res = await authFetch(`${BACKEND_API_URL}/api/rag/ask`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: text,
+          question:        text,
           conversation_id: currentConversationId,
+          history,
         }),
       });
 
       const data = await res.json();
 
       const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.answer,
-        references: data.sources?.map((s: any) => ({
-          title: s.section_title || "Legal Section",
-          citation: `Section ${s.section_number}`,
-        })),
+        id:          (Date.now() + 1).toString(),
+        role:        "assistant",
+        content:     data.answer,
+        law_sources:  data.law_sources  || [],
+        case_sources: data.case_sources || [],
       };
 
       setMessages((prev) => [...prev, aiMessage]);
@@ -142,8 +237,8 @@ export function AiChatInterface({
       setMessages((prev) => [
         ...prev,
         {
-          id: Date.now().toString(),
-          role: "assistant",
+          id:      Date.now().toString(),
+          role:    "assistant",
           content: "⚠️ Error connecting to AI service",
         },
       ]);
@@ -152,109 +247,78 @@ export function AiChatInterface({
     }
   };
 
-  // Helper Function that Ensure conversation exists (create if not) and return ID
+  // ── Conversation helpers ─────────────────────────────────────────────────────
+
   const ensureConversation = async (): Promise<string> => {
-    // If already exists → just return it
     if (conversationId) return conversationId;
+    if (isTyping)       return conversationId!;
 
-    // prevent race condition
-    if (isTyping) return conversationId!;
-    // Otherwise create a new one
-    const res = await authFetch(`${BACKEND_API_URL}/api/rag/conversation`, {
-      method: "POST",
-    });
-
+    const res  = await authFetch(`${BACKEND_API_URL}/api/rag/conversation`, { method: "POST" });
     const data = await res.json();
-
     setConversationId(data.conversation_id);
     loadConversations();
-
     return data.conversation_id;
   };
-  // Load conversations
+
   const loadConversations = async () => {
-    const res = await authFetch(`${BACKEND_API_URL}/api/rag/conversations`);
+    const res  = await authFetch(`${BACKEND_API_URL}/api/rag/conversations`);
     const data = await res.json();
     setConversations(data);
   };
-  // Create new conversation
-  //  if no conversation exists
+
   const createNewChat = async () => {
     setConversationId(null);
     setMessages([...initialMessages]);
-    // setMessages(initialMessages);
     loadConversations();
   };
-  // Load messages when clicking chat from sidebar
+
   const loadMessages = async (id: string) => {
-    const res = await authFetch(`${BACKEND_API_URL}/api/rag/messages/${id}`);
-
+    const res  = await authFetch(`${BACKEND_API_URL}/api/rag/messages/${id}`);
     const data = await res.json();
-
     const formatted = data.map((m: any) => ({
-      id: Math.random().toString(),
-      role: m.role,
+      id:      Math.random().toString(),
+      role:    m.role,
       content: m.content,
+      // Stored messages may not have sources; gracefully default to empty
+      law_sources:  m.law_sources  || [],
+      case_sources: m.case_sources || [],
     }));
-
     setConversationId(id);
     setMessages(formatted);
   };
-  // Delete conversation from sidebar
+
   const deleteConversation = async (id: string) => {
-    await authFetch(`${BACKEND_API_URL}/api/rag/conversation/${id}`, {
-      method: "DELETE",
-    });
+    await authFetch(`${BACKEND_API_URL}/api/rag/conversation/${id}`, { method: "DELETE" });
     await loadConversations();
-
-    // If deleted chat is active → reset UI
-    if (conversationId === id) {
-      createNewChat();
-    }
+    if (conversationId === id) createNewChat();
   };
-  // Rename conversation
-  const renameConversation = async (id: string) => {
-    console.log("Renaming", id, "to", newTitle);
-    if (!newTitle.trim()) return; // ✅ prevent empty titles
-    await authFetch(`${BACKEND_API_URL}/api/rag/conversation/${id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ title: newTitle }),
-    });
 
+  const renameConversation = async (id: string) => {
+    if (!newTitle.trim()) return;
+    await authFetch(`${BACKEND_API_URL}/api/rag/conversation/${id}`, {
+      method:  "PUT",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ title: newTitle }),
+    });
     setEditingChatId(null);
     setNewTitle("");
-
     await loadConversations();
   };
 
-  // const generateAIResponse = (question: string): string => {
-  //   if (
-  //     question.toLowerCase().includes("tenant") ||
-  //     question.toLowerCase().includes("rent")
-  //   ) {
-  //     return "As a tenant, you have several important rights:\n\n1. **Right to Habitable Housing**: Your landlord must maintain the property in a safe and livable condition.\n\n2. **Right to Privacy**: Your landlord must provide proper notice (usually 24-48 hours) before entering your rental unit.\n\n3. **Right to Fair Treatment**: You're protected against discrimination based on race, religion, national origin, disability, or family status.\n\n4. **Security Deposit Rights**: Your landlord must return your security deposit (minus legitimate deductions) within a specific timeframe after you move out.\n\n5. **Right to Withhold Rent**: In some cases, if your landlord fails to make necessary repairs, you may have the right to withhold rent or make repairs and deduct the cost.\n\nThese rights vary by state, so I recommend consulting with a local attorney for specific guidance about your situation.";
-  //   }
-  //   return "I understand your question. Based on current legal standards, here's what you need to know:\n\nThe law in this area has been established through several important court decisions and statutes. Generally speaking, you have certain rights and responsibilities that are protected under law.\n\nI've found some relevant cases and legal references that might help. Would you like me to connect you with a qualified attorney who can provide more specific advice for your situation?";
-  // };
   const displayedMessages = messages.length > 0 ? messages : initialMessages;
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <div className="grid lg:grid-cols-1 gap-6">
-      {/* Main Chat Area */}
       <div className="col-span-1">
         <Card className="h-[calc(100vh-7rem)] overflow-hidden">
           <div className="flex h-full">
-            {/* LEFT: Conversations Sidebar */}
+
+            {/* ── LEFT: Conversations Sidebar ────────────────────────────── */}
             <div className="hidden md:flex md:w-56 lg:w-64 border-r bg-[#F8FAFC] flex-col h-full">
-              {/* w-full max-w-64 border-r bg-[#F8FAFC] flex flex-col h-full */}
-              {/* <div className="hidden md:flex md:w-56 lg:w-64 border-r bg-[#F8FAFC] flex-col h-full"> */}
               <div className="p-3">
-                <Button
-                  className="w-full bg-[#1E3A8A] text-white"
-                  onClick={createNewChat}
-                >
+                <Button className="w-full bg-[#1E3A8A] text-white" onClick={createNewChat}>
                   + New Chat
                 </Button>
               </div>
@@ -265,57 +329,49 @@ export function AiChatInterface({
                     <div
                       key={chat._id}
                       onClick={() => loadMessages(chat._id)}
-                      className={`group flex items-center gap-2 px-3 py-2 mb-2 rounded-full cursor-pointer text-sm ${
-                        conversationId === chat._id
-                          ? "bg-[#1E3A8A] text-white"
-                          : "hover:bg-gray-200"
-                      }`}
+                      className={`group flex items-center gap-2 px-3 py-2 mb-2 rounded-full
+                                  cursor-pointer text-sm
+                                  ${conversationId === chat._id
+                                    ? "bg-[#1E3A8A] text-white"
+                                    : "hover:bg-gray-200"}`}
                     >
-                      {/* LEFT : 3-dot menu */}
                       <div className="relative flex items-center">
-                        <div className="relative flex items-center">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMenu(
-                                activeMenu === chat._id ? null : chat._id,
-                              );
-                            }}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-300"
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenu(activeMenu === chat._id ? null : chat._id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity
+                                     p-1 rounded hover:bg-gray-300"
+                        >
+                          ⋮
+                        </button>
+                        {activeMenu === chat._id && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute left-0 top-8 w-32 bg-white border rounded-md shadow z-10"
                           >
-                            ⋮
-                          </button>
-                          {activeMenu === chat._id && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute left-0 top-8 w-32 bg-white border rounded-md shadow z-10"
+                            <button
+                              className="block w-full text-left px-3 py-2 text-black hover:bg-gray-100"
+                              onClick={() => {
+                                setEditingChatId(chat._id);
+                                setNewTitle(chat.title || "");
+                                setActiveMenu(null);
+                              }}
                             >
-                              <button
-                                className="block w-full text-left px-3 py-2 text-black hover:bg-gray-100"
-                                onClick={() => {
-                                  setEditingChatId(chat._id);
-                                  setNewTitle(chat.title || "");
-                                  setActiveMenu(null);
-                                }}
-                              >
-                                Rename
-                              </button>
-
-                              <button
-                                className="block w-full text-left px-3 py-2 hover:bg-red-100 text-red-600"
-                                onClick={() => deleteConversation(chat._id)}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                              Rename
+                            </button>
+                            <button
+                              className="block w-full text-left px-3 py-2 hover:bg-red-100 text-red-600"
+                              onClick={() => deleteConversation(chat._id)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      {/* LEFT: Title or Input */}
-                      <div
-                        className="flex-1 truncate"
-                        onClick={() => loadMessages(chat._id)}
-                      >
+
+                      <div className="flex-1 truncate" onClick={() => loadMessages(chat._id)}>
                         {editingChatId === chat._id ? (
                           <input
                             className="w-full text-black px-1 bg-transparent outline-none"
@@ -323,10 +379,7 @@ export function AiChatInterface({
                             autoFocus
                             onChange={(e) => setNewTitle(e.target.value)}
                             onBlur={() => renameConversation(chat._id)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter")
-                                renameConversation(chat._id);
-                            }}
+                            onKeyDown={(e) => { if (e.key === "Enter") renameConversation(chat._id); }}
                           />
                         ) : (
                           <p className="truncate">{chat.title || "New Chat"}</p>
@@ -337,29 +390,24 @@ export function AiChatInterface({
               </ScrollArea>
             </div>
 
-            {/* RIGHT: Chat Area */}
+            {/* ── RIGHT: Chat Area ───────────────────────────────────────── */}
             <div className="flex-1 flex flex-col h-full overflow-hidden">
-              {/* HEADER */}
+
+              {/* Header */}
               <CardHeader className="border-b bg-gradient-to-r from-[#1E3A8A] to-[#1E3A8A]/80">
                 <div className="flex items-center gap-3">
                   <Button
-                  variant="ghost"
-                  className="md:hidden text-white"
-                  onClick={() => setSidebarOpen(true)}
-                >
-                  ☰
-                </Button>
+                    variant="ghost"
+                    className="md:hidden text-white"
+                    onClick={() => setSidebarOpen(true)}
+                  >
+                    ☰
+                  </Button>
                   <div className="w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center">
                     <Bot className="h-6 w-6 text-white" />
                   </div>
                   <div className="flex-1">
-                    <CardTitle className="text-white">
-                      AI Legal Assistant
-                    </CardTitle>
-                    {/* {(<p className="text-sm text-white/80">
-                      Ask your legal questions in simple language
-                    </p>) */}
-
+                    <CardTitle className="text-white">AI Legal Assistant</CardTitle>
                   </div>
                   <Badge className="bg-white/20 text-white border-white/30">
                     {user?.role} View
@@ -367,7 +415,7 @@ export function AiChatInterface({
                 </div>
               </CardHeader>
 
-              {/* CHAT CONTENT */}
+              {/* Messages */}
               <CardContent className="flex-1 p-0 flex flex-col overflow-y-auto">
                 <ScrollArea className="flex-1 p-6">
                   <div className="space-y-4">
@@ -375,9 +423,7 @@ export function AiChatInterface({
                       <div
                         key={message.id}
                         className={`flex gap-3 ${
-                          message.role === "user"
-                            ? "justify-end"
-                            : "justify-start"
+                          message.role === "user" ? "justify-end" : "justify-start"
                         }`}
                       >
                         {message.role === "assistant" && (
@@ -389,6 +435,7 @@ export function AiChatInterface({
                         )}
 
                         <div className="max-w-[80%]">
+                          {/* Bubble */}
                           <div
                             className={`rounded-lg p-4 ${
                               message.role === "user"
@@ -396,30 +443,15 @@ export function AiChatInterface({
                                 : "bg-gray-100"
                             }`}
                           >
-                            <p className="text-sm whitespace-pre-wrap">
-                              {message.content}
-                            </p>
+                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                           </div>
-                          {message.references && (
-                            <div className="mt-1 space-y-1">
-                              <p className="text-xs text-gray-500 flex items-center gap-1">
-                                <FileText className="h-3 w-3" />
-                                Legal References:
-                              </p>
-                              {message.references.map((ref, idx) => (
-                                <Card
-                                  key={idx}
-                                  className="border-l-4 border-l-[#D4AF37]"
-                                >
-                                  <CardContent className="p-1">
-                                    <p className="text-xs">{ref.title}</p>
-                                    <p className="text-xs text-gray-500">
-                                      {ref.citation}
-                                    </p>
-                                  </CardContent>
-                                </Card>
-                              ))}
-                            </div>
+
+                          {/* ── References (assistant only) ───────────────── */}
+                          {message.role === "assistant" && (
+                            <>
+                              <LawReferences  sources={message.law_sources  ?? []} />
+                              <CaseReferences sources={message.case_sources ?? []} />
+                            </>
                           )}
                         </div>
 
@@ -452,76 +484,62 @@ export function AiChatInterface({
                   </div>
                 </ScrollArea>
 
-                {/* INPUT */}
+                {/* Input */}
                 <div className="p-4 border-t bg-white">
                   <div className="flex gap-2">
                     <Input
                       placeholder="Ask your legal question..."
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
-                      onKeyPress={(e) =>
-                        e.key === "Enter" && handleSendMessage()
-                      }
+                      onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
                     />
-                    <Button
-                      onClick={() => handleSendMessage()}
-                      className="bg-[#1E3A8A]"
-                    >
+                    <Button onClick={() => handleSendMessage()} className="bg-[#1E3A8A]">
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               </CardContent>
-              {//Mobile Sidebar Overlay
-              sidebarOpen && (
-              <div className="fixed inset-0 z-50 flex">
-                {/* Overlay */}
-                <div
-                  className="absolute inset-0 bg-black/50"
-                  onClick={() => setSidebarOpen(false)}
-                />
 
-                {/* Sidebar */}
-                <div className="relative w-64 bg-[#F8FAFC] h-full flex flex-col shadow-lg">
-                  <div className="p-3 flex justify-between items-center">
-                    <Button
-                      className="w-[calc(100%-1rem)] bg-[#1E3A8A] text-white"
-                      onClick={createNewChat}
-                    >
-                      + New Chat
-                    </Button>
-                    <button
-                      onClick={() => setSidebarOpen(false)}
-                      className="ml-2 text-xl"
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  <ScrollArea className="flex-1 px-2 overflow-y-auto">
-                    {conversations.map((chat) => (
-                      <div
-                        key={chat._id}
-                        onClick={() => {
-                          loadMessages(chat._id);
-                          setSidebarOpen(false);
-                        }}
-                        className="px-3 py-2 mb-2 rounded-full cursor-pointer hover:bg-gray-200"
+              {/* Mobile sidebar overlay */}
+              {sidebarOpen && (
+                <div className="fixed inset-0 z-50 flex">
+                  <div
+                    className="absolute inset-0 bg-black/50"
+                    onClick={() => setSidebarOpen(false)}
+                  />
+                  <div className="relative w-64 bg-[#F8FAFC] h-full flex flex-col shadow-lg">
+                    <div className="p-3 flex justify-between items-center">
+                      <Button
+                        className="w-[calc(100%-1rem)] bg-[#1E3A8A] text-white"
+                        onClick={createNewChat}
                       >
-                        {chat.title || "New Chat"}
-                      </div>
-                    ))}
-                  </ScrollArea>
+                        + New Chat
+                      </Button>
+                      <button onClick={() => setSidebarOpen(false)} className="ml-2 text-xl">
+                        ✕
+                      </button>
+                    </div>
+                    <ScrollArea className="flex-1 px-2 overflow-y-auto">
+                      {conversations.map((chat) => (
+                        <div
+                          key={chat._id}
+                          onClick={() => { loadMessages(chat._id); setSidebarOpen(false); }}
+                          className="px-3 py-2 mb-2 rounded-full cursor-pointer hover:bg-gray-200"
+                        >
+                          {chat.title || "New Chat"}
+                        </div>
+                      ))}
+                    </ScrollArea>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
             </div>
           </div>
         </Card>
       </div>
-      {/* Sidebar */}
+
+      {/* ── Bottom cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-        {/* Quick Questions */}
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle className="text-[#1E293B] flex items-center gap-2">
@@ -534,7 +552,8 @@ export function AiChatInterface({
               <Button
                 key={idx}
                 variant="outline"
-                className="w-full justify-start text-left h-auto py-3 hover:border-[#1E3A8A] hover:text-[#1E3A8A]"
+                className="w-full justify-start text-left h-auto py-3
+                           hover:border-[#1E3A8A] hover:text-[#1E3A8A]"
                 onClick={() => handleSendMessage(question)}
               >
                 <MessageCircle className="h-4 w-4 mr-2 flex-shrink-0" />
@@ -544,7 +563,6 @@ export function AiChatInterface({
           </CardContent>
         </Card>
 
-        {/* Help Card */}
         {user?.role === "client" && (
           <Card className="border-2 border-[#D4AF37]/20 bg-[#D4AF37]/5">
             <CardHeader>
@@ -566,7 +584,6 @@ export function AiChatInterface({
           </Card>
         )}
 
-        {/* Info Card */}
         <Card>
           <CardHeader>
             <CardTitle className="text-[#1E293B]">How This Works</CardTitle>
@@ -579,11 +596,11 @@ export function AiChatInterface({
               </li>
               <li className="flex gap-2">
                 <span className="text-[#1E3A8A]">•</span>
-                <span>Get simplified explanations</span>
+                <span>See relevant law sections (PPC / CrPC)</span>
               </li>
               <li className="flex gap-2">
                 <span className="text-[#1E3A8A]">•</span>
-                <span>See relevant case references</span>
+                <span>See real case precedents with outcomes</span>
               </li>
               <li className="flex gap-2">
                 <span className="text-[#1E3A8A]">•</span>

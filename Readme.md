@@ -1,4 +1,4 @@
-To Run Rag Service :
+## To Run Rag Service :
 uvicorn app:app --reload --port 8001
 # LegisCounsel
 
