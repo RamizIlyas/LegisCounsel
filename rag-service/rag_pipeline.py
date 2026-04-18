@@ -1,3 +1,9 @@
+# rag_pipeline.py
+# RAG Pipeline for Pakistan Penal Code Legal Assistant
+# This code sets up a Retrieval-Augmented Generation (RAG) system using ChromaDB for vector storage and Ollama for LLM generation.
+# It includes methods for preparing documents, retrieving relevant sections, building prompts, generating answers
+# and rewriting follow-up questions to be self-contained.
+
 # from urllib import response
 import chromadb
 from chromadb.utils import embedding_functions

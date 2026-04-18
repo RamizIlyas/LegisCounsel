@@ -40,48 +40,10 @@ class LocalLawVectorDB:
         )
         
         print(f"✅ Initialization completed in {time.time() - start_time:.2f} seconds")
-    
-    # OLD method without chunking
-    # def prepare_documents_simple(self):
-    #     """Simple document preparation"""
-    #     print("📚 Preparing documents from MongoDB...")
-        
-    #     documents = []
-    #     metadatas = []
-    #     ids = []
-        
-    #     sections = self.sections_collection.find({})
-        
-    #     for section in sections:
-    #         section_id = str(section.get("section_number", ""))
-    #         content = section.get("content", "").strip()
-    #         title = section.get("section_title", "").strip()
-    #         chapter = section.get("chapter", "")
-            
-    #         if not content:
-    #             continue
-            
-    #         # Simple content - no chunking
-    #         # if len(content) > 1500:
-    #         #     content = content[:1500] + "..."
-            
-    #         full_content = f"Section {section_id}: {title}. {content}"
-            
-    #         documents.append(full_content)
-    #         metadatas.append({
-    #             "section_number": section_id,
-    #             "section_title": title,
-    #             "chapter": chapter,
-    #             "source": "Pakistan Penal Code"
-    #         })
-    #         ids.append(str(uuid.uuid4())[:16])
-        
-    #     print(f"✅ Prepared {len(documents)} documents")
-    #     return documents, metadatas, ids
+
 
 
     ### New method with chunking
-
     def prepare_documents_simple(self):
         print("📚 Preparing documents from MongoDB...")
     
