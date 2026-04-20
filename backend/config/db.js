@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 
 const connectDB = async () => {
   try {
-    await mongoose.connect("mongodb://localhost:27017/Practice");
-    console.log("MongoDB connected (practice)");
+    await mongoose.connect("mongodb://localhost:27017/LegisCounsel");
+    console.log("MongoDB connected (LegisCounsel)");
   } catch (err) {
     console.error(err);
     process.exit(1);

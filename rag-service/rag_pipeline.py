@@ -258,7 +258,7 @@ Rewritten standalone question:"""
         """
         # 1. Rewrite if follow-up
         retrieval_query = (
-            self.rewrite_query(query, history) if history else query
+            self.rewrite_query(query, history) # if history else query #commented out so rewriting happens on every query, not just follow-ups. This is because even standalone queries can be vague and benefit from expansion based on the model's understanding of relevant context from the history.
         )
 
         # 2. Retrieve from both DBs
