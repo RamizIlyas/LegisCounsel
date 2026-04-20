@@ -168,14 +168,14 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
                   </div>
                 </div>
 
-                <Button
+                {/* <Button
                   type="button"
                   variant="outline"
                   className="w-full border-2 border-[#D4AF37] text-[#1E293B]"
                   onClick={handleGuestAccess}
                 >
                   Continue as Guest
-                </Button>
+                </Button> */}
 
               </form>
 

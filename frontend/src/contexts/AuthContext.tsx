@@ -6,6 +6,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  initials?: string;
 }
 
 interface AuthContextType {
@@ -15,6 +16,13 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const initials = (name: string) =>
+    name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
@@ -24,8 +32,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const login = (userData: User, token: string) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
+    setUser({ ...userData, initials: initials(userData.name) });
+    localStorage.setItem('user', JSON.stringify({ ...userData, initials: initials(userData.name) }));
     localStorage.setItem('token', token);
   };
 

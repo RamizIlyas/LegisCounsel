@@ -102,9 +102,9 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
                 <Activity className="h-4 w-4" />
-                Model Accuracy
+                Avg Model Response Time
               </CardDescription>
-              <CardTitle className="text-[#1E3A8A] text-3xl">96.2%</CardTitle>
+              <CardTitle className="text-[#1E3A8A] text-3xl">6.3s</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2 text-sm text-green-600">
@@ -120,7 +120,7 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
                 <Database className="h-4 w-4" />
                 Legal Documents
               </CardDescription>
-              <CardTitle className="text-[#D4AF37] text-3xl">10.2M</CardTitle>
+              <CardTitle className="text-[#D4AF37] text-3xl">10.2k</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -159,9 +159,9 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
             <CardHeader>
               <CardTitle className="text-[#1E293B] flex items-center gap-2">
                 <Activity className="h-5 w-5 text-[#D4AF37]" />
-                AI Model Accuracy
+                Ai Response Time
               </CardTitle>
-              <CardDescription>Accuracy trends over the last 6 months</CardDescription>
+              <CardDescription>Response time trends over the last 6 months</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -186,7 +186,7 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
         </div>
 
         {/* System Health */}
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle className="text-[#1E293B]">System Health</CardTitle>
             <CardDescription>Real-time system performance metrics</CardDescription>
@@ -221,7 +221,7 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
               <Progress value={67} className="h-2" />
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
     </DashboardLayout>
   );

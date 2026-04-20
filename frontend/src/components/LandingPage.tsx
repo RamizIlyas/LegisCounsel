@@ -69,14 +69,14 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                   <Users className="mr-2 h-5 w-5" />
                   Try as Client
                 </Button>
-                <Button 
+                {/* <Button 
                   size="lg"
                   variant="outline"
                   onClick={() => onNavigate('login')}
                   className="bg-transparent border-2 border-white text-white hover:bg-white/10"
                 >
                   Continue as Guest
-                </Button>
+                </Button> */}
               </div>
             </div>
             <div className="relative">

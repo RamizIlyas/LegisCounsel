@@ -16,7 +16,7 @@ interface ManagementProps {
 const recentUsers = [
   { id: '1', name: 'John Doe', email: 'john.doe@law.com', role: 'Lawyer', status: 'active', joined: '2025-10-15' },
   { id: '2', name: 'Alice Client', email: 'alice@email.com', role: 'Client', status: 'active', joined: '2025-10-14' },
-  { id: '3', name: 'Robert Smith', email: 'robert.s@law.com', role: 'Lawyer', status: 'pending', joined: '2025-10-13' },
+  { id: '3', name: 'Robert Smith', email: 'robert.s@law.com', role: 'Lawyer', status: 'active', joined: '2025-10-13' },
 ];
 
 const lawData = [

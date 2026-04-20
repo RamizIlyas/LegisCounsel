@@ -110,7 +110,7 @@ export function LawyerDashboard({ onNavigate, onLogout, onRoleSwitch }: LawyerDa
         {/* Welcome Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-[#1E293B] mb-2">Welcome back, {user?.name ? user?.name : "Guest"}</h1>
+            <h1 className="text-[#1E293B]">Welcome back, {user?.name ? user?.name : "Guest"}</h1>
             <p className="text-gray-600">Find the perfect legal precedent with AI-powered search</p>
           </div>
           <Badge className="bg-[#1E3A8A] text-white">Lawyer View</Badge>

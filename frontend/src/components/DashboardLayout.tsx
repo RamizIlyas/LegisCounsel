@@ -84,7 +84,7 @@ export function DashboardLayout({
   const clientMenuExtras: MenuItem[] = [
     { icon: FileSearch, label: 'Legal Search', page: 'dashboard' as Page },
     { icon: Bookmark, label: 'Saved Cases', page: 'dashboard' as Page },
-    { icon: Bell, label: 'Notifications', badge: '3', page: 'dashboard' as Page },
+    // { icon: Bell, label: 'Notifications', badge: '3', page: 'dashboard' as Page },
     { icon: Briefcase, label: 'Case Management', page: 'cases' as Page },
   ];
 
@@ -179,7 +179,7 @@ export function DashboardLayout({
             </div>
 
             {/* Centre: Search bar */}
-            <div className="flex-1 max-w-2xl">
+            {/* <div className="flex-1 max-w-2xl">
               {searchBar || (
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -189,21 +189,21 @@ export function DashboardLayout({
                   />
                 </div>
               )}
-            </div>
+            </div> */}
 
             {/* Right: Bell + Avatar */}
             <div className="flex items-center gap-2 shrink-0">
-              <Button variant="ghost" size="icon" className="relative">
+              {/*<Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5 text-gray-600" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-              </Button>
+              </Button>*/}
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center gap-2 px-2">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-[#1E3A8A] text-white text-xs">
-                        {userRole === 'lawyer' ? 'LA' : userRole === 'client' ? 'RC' : 'AD'}
+                        {user?.initials || (userRole === 'lawyer' ? 'LA' : userRole === 'client' ? 'RC' : 'AD')}
                       </AvatarFallback>
                     </Avatar>
                     <div className="hidden md:block text-left">

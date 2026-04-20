@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { Page, UserRole } from '../App';
 // import { toast } from 'sonner@2.0.3';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SettingsPageProps {
   userRole: UserRole;
@@ -36,10 +37,12 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
   const [pushNotifications, setPushNotifications] = useState(true);
   const [caseUpdates, setCaseUpdates] = useState(true);
   const [marketingEmails, setMarketingEmails] = useState(false);
+  const { user } = useAuth();
 
   const [profileData, setProfileData] = useState({
-    name: userRole === 'lawyer' ? 'John Doe' : userRole === 'client' ? 'Alice Client' : 'Admin User',
-    email: userRole === 'lawyer' ? 'john.doe@law.com' : 'alice@email.com',
+    name: user?.name || (userRole === 'lawyer' ? 'John Doe' : userRole === 'client' ? 'Alice Client' : 'Admin User'),
+    email: user?.email || (userRole === 'lawyer' ? 'john.doe@law.com' : 'alice@email.com'),
+
     phone: '+1 (555) 123-4567',
     location: 'New York, NY',
     organization: userRole === 'lawyer' ? 'Doe & Associates Law Firm' : 'N/A'
@@ -71,9 +74,9 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
         <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            {/* <TabsTrigger value="notifications">Notifications</TabsTrigger> */}
             <TabsTrigger value="security">Security</TabsTrigger>
-            <TabsTrigger value="preferences">Preferences</TabsTrigger>
+            {/* <TabsTrigger value="preferences">Preferences</TabsTrigger> */}
           </TabsList>
 
           {/* Profile Tab */}
@@ -91,16 +94,18 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                 <div className="flex items-center gap-6">
                   <Avatar className="h-24 w-24">
                     <AvatarFallback className="bg-[#1E3A8A] text-white text-2xl">
-                      {userRole === 'lawyer' ? 'LA' : userRole === 'client' ? 'RC' : 'AD'}
+                      {user?.initials || (userRole === 'lawyer' ? 'JD' : userRole === 'client' ? 'AC' : 'AD')}
+                      {/* {userRole === 'lawyer' ? 'LA' : userRole === 'client' ? 'RC' : 'AD'} */}
                     </AvatarFallback>
                   </Avatar>
                   <div className="space-y-2">
-                    <Button variant="outline" className="gap-2">
+                    {/* <Button variant="outline" className="gap-2">
                       <Camera className="h-4 w-4" />
                       Change Photo
-                    </Button>
-                    <p className="text-xs text-gray-500">
-                      JPG, PNG or GIF. Max size 2MB
+                    </Button> */}
+                    <p className="text-sm text-black/80">
+                      {/* JPG, PNG or GIF. Max size 2MB */}
+                      {user?.name || (userRole === 'lawyer' ? 'John Doe' : userRole === 'client' ? 'Alice Client' : 'Admin User')}
                     </p>
                   </div>
                 </div>
@@ -186,9 +191,22 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                 </div>
               </CardContent>
             </Card>
+            <Card className="border-red-200 bg-red-50">
+              <CardHeader>
+                <CardTitle className="text-red-800">Danger Zone</CardTitle>
+                <CardDescription className="text-red-600">
+                  Irreversible actions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="destructive">
+                  Delete Account
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          {/* Notifications Tab */}
+          {/* Notifications Tab (Removed) */}
           <TabsContent value="notifications" className="space-y-6">
             <Card>
               <CardHeader>
@@ -301,7 +319,7 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
 
                 <Separator />
 
-                <div className="space-y-4">
+                {/* <div className="space-y-4">
                   <h4 className="text-[#1E293B]">Two-Factor Authentication</h4>
                   <p className="text-sm text-gray-600">
                     Add an extra layer of security to your account
@@ -309,7 +327,7 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                   <Button variant="outline">
                     Enable Two-Factor Authentication
                   </Button>
-                </div>
+                </div> */}
               </CardContent>
             </Card>
           </TabsContent>
@@ -370,8 +388,8 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                 </div>
               </CardContent>
             </Card>
-
-            <Card className="border-red-200 bg-red-50">
+            {/* Added this delete profile section in profile */}
+            {/* <Card className="border-red-200 bg-red-50">
               <CardHeader>
                 <CardTitle className="text-red-800">Danger Zone</CardTitle>
                 <CardDescription className="text-red-600">
@@ -383,7 +401,7 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                   Delete Account
                 </Button>
               </CardContent>
-            </Card>
+            </Card> */}
           </TabsContent>
         </Tabs>
       </div>
