@@ -1,5 +1,5 @@
 // AiChatInterface.tsx
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -10,12 +10,13 @@ import {
   Send,
   Bot,
   User,
-  FileText,
   Scale,
   MessageCircle,
   Sparkles,
   BookOpen,
   Gavel,
+  Bookmark,
+  BookmarkCheck,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -47,6 +48,36 @@ interface Message {
   case_sources?: CaseSource[];
 }
 
+// ── Auth fetch helper ─────────────────────────────────────────────────────────
+
+const authFetch = (url: string, options: RequestInit = {}) => {
+  const token = localStorage.getItem("token");
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      Authorization: `Bearer ${token}`,
+    },
+  });
+};
+
+// ── Stable content hash (mirrors server logic) ────────────────────────────────
+// We use a simple djb2 variant; the server uses sha256 truncated to 32 chars.
+// Because we only use this client-side to key the bookmarked-set, and we store
+// the real server hash in the bookmark record, we just need something stable
+// per content string. We re-derive the server hash by storing it in the set
+// after the server responds.
+async function sha256Hex32(str: string): Promise<string> {
+  const buf = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(str)
+  );
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 32);
+}
+
 // ── Outcome badge colour helper ───────────────────────────────────────────────
 
 function outcomeColor(outcome: string): string {
@@ -66,7 +97,7 @@ function outcomeColor(outcome: string): string {
   return "bg-gray-100 text-gray-700 border-gray-300";
 }
 
-// ── Reference panels rendered under each assistant message ───────────────────
+// ── Reference panels ──────────────────────────────────────────────────────────
 
 function LawReferences({ sources }: { sources: LawSource[] }) {
   if (!sources?.length) return null;
@@ -111,16 +142,11 @@ function CaseReferences({ sources }: { sources: CaseSource[] }) {
             className="flex items-center gap-2 border border-[#D4AF37]/40 bg-[#D4AF37]/5
                        rounded-md px-2 py-1.5 text-xs"
           >
-            {/* Left gold bar */}
             <div className="w-0.5 self-stretch bg-[#D4AF37] rounded-full flex-shrink-0" />
-
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-800 truncate">
-                {s.citation}
-              </p>
+              <p className="font-semibold text-gray-800 truncate">{s.citation}</p>
               <p className="text-gray-500 truncate">{s.court}</p>
             </div>
-
             {s.outcome && (
               <span
                 className={`flex-shrink-0 border rounded px-1.5 py-0.5 text-[10px] font-medium
@@ -129,7 +155,6 @@ function CaseReferences({ sources }: { sources: CaseSource[] }) {
                 {s.outcome}
               </span>
             )}
-
             {s.sections && (
               <span className="flex-shrink-0 bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 text-[10px]">
                 § {s.sections}
@@ -139,6 +164,78 @@ function CaseReferences({ sources }: { sources: CaseSource[] }) {
         ))}
       </div>
     </div>
+  );
+}
+
+// ── Bookmark button ───────────────────────────────────────────────────────────
+
+interface BookmarkButtonProps {
+  message: Message;
+  conversationId: string | null;
+  bookmarkedHashes: Set<string>;
+  bookmarkIdByHash: Record<string, string>;
+  onToggle: (
+    message: Message,
+    hash: string,
+    isCurrentlyBookmarked: boolean,
+    bookmarkId?: string
+  ) => void;
+}
+
+function BookmarkButton({
+  message,
+  conversationId,
+  bookmarkedHashes,
+  bookmarkIdByHash,
+  onToggle,
+}: BookmarkButtonProps) {
+  const [hash, setHash] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    sha256Hex32(message.content).then(setHash);
+  }, [message.content]);
+
+  if (!hash) return null;
+
+  const isBookmarked = bookmarkedHashes.has(hash);
+  const bookmarkId = bookmarkIdByHash[hash];
+
+  const handleClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (pending) return;
+    setPending(true);
+    await onToggle(message, hash, isBookmarked, bookmarkId);
+    setPending(false);
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={pending}
+      title={isBookmarked ? "Remove bookmark" : "Bookmark this response"}
+      className={`
+        flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-xs transition-all
+        ${
+          isBookmarked
+            ? "text-[#D4AF37] hover:text-red-500"
+            : "text-gray-400 hover:text-[#D4AF37]"
+        }
+        ${pending ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+      `}
+    >
+      {isBookmarked ? (
+        <>
+          <BookmarkCheck className="h-3.5 w-3.5" />
+          <span>Saved</span>
+        </>
+      ) : (
+        <>
+          <Bookmark className="h-3.5 w-3.5" />
+          <span>Save</span>
+        </>
+      )}
+    </button>
   );
 }
 
@@ -160,16 +257,6 @@ const quickQuestions = [
   "Explain employment discrimination laws",
 ];
 
-// ── Auth fetch helper ─────────────────────────────────────────────────────────
-
-const authFetch = (url: string, options: any = {}) => {
-  const token = localStorage.getItem("token");
-  return fetch(url, {
-    ...options,
-    headers: { ...options.headers, Authorization: `Bearer ${token}` },
-  });
-};
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface AiChatInterfaceProps {
@@ -190,7 +277,37 @@ export function AiChatInterface({
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // ── Bookmark state ──────────────────────────────────────────────────────────
+  // Set of content_hash strings the current user has bookmarked
+  const [bookmarkedHashes, setBookmarkedHashes] = useState<Set<string>>(
+    new Set()
+  );
+  // Map content_hash → MongoDB _id (needed for delete)
+  const [bookmarkIdByHash, setBookmarkIdByHash] = useState<
+    Record<string, string>
+  >({});
+
   const { user } = useAuth();
+
+  // ── Load existing bookmarks on mount ────────────────────────────────────────
+  useEffect(() => {
+    const loadBookmarks = async () => {
+      try {
+        const res = await authFetch(`${BACKEND_API_URL}/api/bookmarks`);
+        if (!res.ok) return;
+        const data: Array<{ _id: string; content_hash: string }> =
+          await res.json();
+        setBookmarkedHashes(new Set(data.map((b) => b.content_hash)));
+        setBookmarkIdByHash(
+          Object.fromEntries(data.map((b) => [b.content_hash, b._id]))
+        );
+      } catch {
+        /* silently ignore – non-critical */
+      }
+    };
+    loadBookmarks();
+  }, []);
 
   useEffect(() => {
     const close = () => setActiveMenu(null);
@@ -201,6 +318,62 @@ export function AiChatInterface({
   useEffect(() => {
     loadConversations();
   }, []);
+
+  // ── Bookmark toggle ──────────────────────────────────────────────────────────
+
+  const handleBookmarkToggle = useCallback(
+    async (
+      message: Message,
+      hash: string,
+      isCurrentlyBookmarked: boolean,
+      bookmarkId?: string
+    ) => {
+      if (isCurrentlyBookmarked && bookmarkId) {
+        // ── Remove bookmark ──
+        try {
+          await authFetch(`${BACKEND_API_URL}/api/bookmarks/${bookmarkId}`, {
+            method: "DELETE",
+          });
+          setBookmarkedHashes((prev) => {
+            const next = new Set(prev);
+            next.delete(hash);
+            return next;
+          });
+          setBookmarkIdByHash((prev) => {
+            const next = { ...prev };
+            delete next[hash];
+            return next;
+          });
+        } catch (err) {
+          console.error("Failed to remove bookmark", err);
+        }
+      } else {
+        // ── Add bookmark ──
+        try {
+          const res = await authFetch(`${BACKEND_API_URL}/api/bookmarks`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              content: message.content,
+              law_sources: message.law_sources ?? [],
+              case_sources: message.case_sources ?? [],
+              conversation_id: conversationId,
+            }),
+          });
+          if (!res.ok) throw new Error("Server error");
+          const saved = await res.json();
+          setBookmarkedHashes((prev) => new Set(prev).add(hash));
+          setBookmarkIdByHash((prev) => ({
+            ...prev,
+            [hash]: saved._id,
+          }));
+        } catch (err) {
+          console.error("Failed to save bookmark", err);
+        }
+      }
+    },
+    [conversationId]
+  );
 
   // ── Send message ────────────────────────────────────────────────────────────
 
@@ -219,9 +392,8 @@ export function AiChatInterface({
     setInputValue("");
     setIsTyping(true);
 
-    // Build history array from current messages for the backend
     const history = messages
-      .filter((m) => m.id !== "1") // skip the greeting
+      .filter((m) => m.id !== "1")
       .map((m) => ({ role: m.role, content: m.content }));
 
     try {
@@ -296,7 +468,6 @@ export function AiChatInterface({
       id: Math.random().toString(),
       role: m.role,
       content: m.content,
-      // Stored messages may not have sources; gracefully default to empty
       law_sources: m.law_sources || [],
       case_sources: m.case_sources || [],
     }));
@@ -363,7 +534,7 @@ export function AiChatInterface({
                           onClick={(e) => {
                             e.stopPropagation();
                             setActiveMenu(
-                              activeMenu === chat._id ? null : chat._id,
+                              activeMenu === chat._id ? null : chat._id
                             );
                           }}
                           className="opacity-0 group-hover:opacity-100 transition-opacity
@@ -396,10 +567,7 @@ export function AiChatInterface({
                         )}
                       </div>
 
-                      <div
-                        className="flex-1 truncate"
-                        onClick={() => loadMessages(chat._id)}
-                      >
+                      <div className="flex-1 truncate">
                         {editingChatId === chat._id ? (
                           <input
                             className="w-full text-black px-1 bg-transparent outline-none"
@@ -482,7 +650,7 @@ export function AiChatInterface({
                             </p>
                           </div>
 
-                          {/* ── References (assistant only) ───────────────── */}
+                          {/* References + bookmark (assistant only) */}
                           {message.role === "assistant" && (
                             <>
                               <LawReferences
@@ -491,6 +659,16 @@ export function AiChatInterface({
                               <CaseReferences
                                 sources={message.case_sources ?? []}
                               />
+                              {/* Don't show bookmark on the static greeting */}
+                              {message.id !== "1" && (
+                                <BookmarkButton
+                                  message={message}
+                                  conversationId={conversationId}
+                                  bookmarkedHashes={bookmarkedHashes}
+                                  bookmarkIdByHash={bookmarkIdByHash}
+                                  onToggle={handleBookmarkToggle}
+                                />
+                              )}
                             </>
                           )}
                         </div>
@@ -652,6 +830,10 @@ export function AiChatInterface({
               <li className="flex gap-2">
                 <span className="text-[#1E3A8A]">•</span>
                 <span>See real case precedents with outcomes</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-[#1E3A8A]">•</span>
+                <span>Save important responses with the bookmark button</span>
               </li>
               <li className="flex gap-2">
                 <span className="text-[#1E3A8A]">•</span>

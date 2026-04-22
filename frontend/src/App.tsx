@@ -10,11 +10,12 @@ import { SettingsPage } from './components/SettingsPage';
 import { Toaster } from './components/ui/sonner';
 import { SignupPage } from './components/SignupPage';
 import { ManagementPanel } from './components/ManagementPanel';
+import { SavedBookmarks } from './components/SavedBookmarks';
 import {useAuth} from './contexts/AuthContext';
 
 export type UserRole = 'lawyer' | 'client' | 'admin' | null;
 
-export type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'cases' | 'communication' | 'admin' | 'management'| 'settings';
+export type Page = 'landing' | 'login' | 'signup' | 'dashboard' | 'cases' | 'communication' | 'admin' | 'management'| 'settings'|'bookmarks';
 
 // export type User = {
 //   name: string;
@@ -76,6 +77,8 @@ export default function App() {
           : <ClientDashboard onNavigate={handleNavigation} onLogout={handleLogout} onRoleSwitch={handleRoleSwitch} />;
       case 'cases':
         return <CaseManagement userRole={userRole} onNavigate={handleNavigation} onLogout={handleLogout} />;
+      case 'bookmarks':
+        return <SavedBookmarks onNavigate={handleNavigation} onLogout={handleLogout} onRoleSwitch={handleRoleSwitch} />;
       case 'communication':
         return <Communication userRole={userRole} onNavigate={handleNavigation} onLogout={handleLogout} />;
       case 'management':

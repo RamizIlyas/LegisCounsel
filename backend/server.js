@@ -14,6 +14,7 @@ import authRoutes from "./routes/authRoutes.js";
 import ragRoutes from "./routes/ragRoutes.js";
 import caseRoutes from "./routes/caseRoutes.js";
 import communicationRoutes from "./routes/chatCommunicationRoutes.js";
+import bookmarkRoutes from "./routes/bookmarkRoutes.js";
 
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -65,7 +66,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/rag", ragRoutes);
 app.use("/api/cases", caseRoutes);
 app.use("/api/conversations", communicationRoutes);
-
+app.use("/api/bookmarks", bookmarkRoutes);
 // ─── Multer error handler ─────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
   if (err.code === "LIMIT_FILE_SIZE")

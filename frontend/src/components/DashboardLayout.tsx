@@ -1,3 +1,5 @@
+//DashboardLayout.tsx
+//Commented part is important DO NOT REMOVE
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -83,7 +85,7 @@ export function DashboardLayout({
 
   const clientMenuExtras: MenuItem[] = [
     { icon: FileSearch, label: 'Legal Search', page: 'dashboard' as Page },
-    { icon: Bookmark, label: 'Saved Cases', page: 'dashboard' as Page },
+    { icon: Bookmark, label: 'Bookmarks', page: 'bookmarks' as Page },
     // { icon: Bell, label: 'Notifications', badge: '3', page: 'dashboard' as Page },
     { icon: Briefcase, label: 'Case Management', page: 'cases' as Page },
   ];
