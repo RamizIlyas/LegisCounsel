@@ -100,8 +100,7 @@ router.get("/messages/:id", protect, async (req, res) => {
 // Ask RAG Route
 router.post("/ask", protect, async (req, res) => {
   try {
-    const { question, conversation_id } = req.body;
-
+    const { question, conversation_id ,user_role} = req.body;
     // 1. Load history from DB
     const historyDocs = await Message.find({
       conversation_id,
@@ -113,7 +112,7 @@ router.post("/ask", protect, async (req, res) => {
     }));
 
     // 2. Call RAG service
-    const result = await askRAG(question, history);
+    const result = await askRAG(question, history,user_role);
     const answer = result.answer;
 
     // 3. Save user message

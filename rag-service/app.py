@@ -24,6 +24,7 @@ class Query(BaseModel):
     question:        str
     conversation_id: Optional[str] = None
     history:         list          = []   # list of {role, content} dicts
+    user_role:       Optional[str] = "client"  # e.g. "client", "lawyer"
     # Optional RAG filters
     case_section:    Optional[str] = None  # e.g. "302"
     case_outcome:    Optional[str] = None  # e.g. "Acquitted"
@@ -55,9 +56,11 @@ class AskResponse(BaseModel):
 @app.post("/ask", response_model=AskResponse)
 def ask(query: Query):
     try:
+        # print("Received query:", query)
         result = rag.ask(
             query        = query.question,
             history      = query.history or None,
+            user_role    = query.user_role or "client",
             case_section = query.case_section,
             case_outcome = query.case_outcome,
         )

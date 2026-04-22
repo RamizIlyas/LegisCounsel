@@ -51,12 +51,18 @@ interface Message {
 
 function outcomeColor(outcome: string): string {
   const o = outcome.toLowerCase();
-  if (o.includes("acquit"))         return "bg-green-100 text-green-800 border-green-300";
-  if (o.includes("bail granted"))   return "bg-blue-100  text-blue-800  border-blue-300";
-  if (o.includes("bail refused"))   return "bg-red-100   text-red-800   border-red-300";
-  if (o.includes("allowed"))        return "bg-emerald-100 text-emerald-800 border-emerald-300";
-  if (o.includes("dismissed"))      return "bg-orange-100 text-orange-800 border-orange-300";
-  if (o.includes("convict"))        return "bg-red-100   text-red-800   border-red-300";
+  if (o.includes("acquit"))
+    return "bg-green-100 text-green-800 border-green-300";
+  if (o.includes("bail granted"))
+    return "bg-blue-100  text-blue-800  border-blue-300";
+  if (o.includes("bail refused"))
+    return "bg-red-100   text-red-800   border-red-300";
+  if (o.includes("allowed"))
+    return "bg-emerald-100 text-emerald-800 border-emerald-300";
+  if (o.includes("dismissed"))
+    return "bg-orange-100 text-orange-800 border-orange-300";
+  if (o.includes("convict"))
+    return "bg-red-100   text-red-800   border-red-300";
   return "bg-gray-100 text-gray-700 border-gray-300";
 }
 
@@ -77,8 +83,12 @@ function LawReferences({ sources }: { sources: LawSource[] }) {
             className="flex items-center gap-1.5 border border-[#1E3A8A]/30 bg-[#1E3A8A]/5
                        rounded-md px-2 py-1 text-xs"
           >
-            <span className="font-semibold text-[#1E3A8A]">§ {s.section_number}</span>
-            <span className="text-gray-600 truncate max-w-[160px]">{s.section_title}</span>
+            <span className="font-semibold text-[#1E3A8A]">
+              § {s.section_number}
+            </span>
+            <span className="text-gray-600 truncate max-w-[160px]">
+              {s.section_title}
+            </span>
           </div>
         ))}
       </div>
@@ -105,7 +115,9 @@ function CaseReferences({ sources }: { sources: CaseSource[] }) {
             <div className="w-0.5 self-stretch bg-[#D4AF37] rounded-full flex-shrink-0" />
 
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-800 truncate">{s.citation}</p>
+              <p className="font-semibold text-gray-800 truncate">
+                {s.citation}
+              </p>
               <p className="text-gray-500 truncate">{s.court}</p>
             </div>
 
@@ -169,16 +181,16 @@ export function AiChatInterface({
   onConnectWithLawyer,
   onRoleSwitch,
 }: AiChatInterfaceProps) {
-  const [messages, setMessages]           = useState<Message[]>(initialMessages);
-  const [inputValue, setInputValue]       = useState("");
-  const [isTyping, setIsTyping]           = useState(false);
+  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [inputValue, setInputValue] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
-  const [activeMenu, setActiveMenu]       = useState<string | null>(null);
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
-  const [newTitle, setNewTitle]           = useState("");
-  const [sidebarOpen, setSidebarOpen]     = useState(false);
-  const { user }                          = useAuth();
+  const [newTitle, setNewTitle] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     const close = () => setActiveMenu(null);
@@ -186,7 +198,9 @@ export function AiChatInterface({
     return () => document.removeEventListener("click", close);
   }, []);
 
-  useEffect(() => { loadConversations(); }, []);
+  useEffect(() => {
+    loadConversations();
+  }, []);
 
   // ── Send message ────────────────────────────────────────────────────────────
 
@@ -197,7 +211,7 @@ export function AiChatInterface({
     const currentConversationId = await ensureConversation();
 
     const userMessage: Message = {
-      id:   Date.now().toString(),
+      id: Date.now().toString(),
       role: "user",
       content: text,
     };
@@ -207,7 +221,7 @@ export function AiChatInterface({
 
     // Build history array from current messages for the backend
     const history = messages
-      .filter((m) => m.id !== "1")   // skip the greeting
+      .filter((m) => m.id !== "1") // skip the greeting
       .map((m) => ({ role: m.role, content: m.content }));
 
     try {
@@ -215,19 +229,20 @@ export function AiChatInterface({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question:        text,
+          question: text,
           conversation_id: currentConversationId,
           history,
+          user_role: user?.role,
         }),
       });
 
       const data = await res.json();
 
       const aiMessage: Message = {
-        id:          (Date.now() + 1).toString(),
-        role:        "assistant",
-        content:     data.answer,
-        law_sources:  data.law_sources  || [],
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.answer,
+        law_sources: data.law_sources || [],
         case_sources: data.case_sources || [],
       };
 
@@ -237,8 +252,8 @@ export function AiChatInterface({
       setMessages((prev) => [
         ...prev,
         {
-          id:      Date.now().toString(),
-          role:    "assistant",
+          id: Date.now().toString(),
+          role: "assistant",
           content: "⚠️ Error connecting to AI service",
         },
       ]);
@@ -251,9 +266,11 @@ export function AiChatInterface({
 
   const ensureConversation = async (): Promise<string> => {
     if (conversationId) return conversationId;
-    if (isTyping)       return conversationId!;
+    if (isTyping) return conversationId!;
 
-    const res  = await authFetch(`${BACKEND_API_URL}/api/rag/conversation`, { method: "POST" });
+    const res = await authFetch(`${BACKEND_API_URL}/api/rag/conversation`, {
+      method: "POST",
+    });
     const data = await res.json();
     setConversationId(data.conversation_id);
     loadConversations();
@@ -261,7 +278,7 @@ export function AiChatInterface({
   };
 
   const loadConversations = async () => {
-    const res  = await authFetch(`${BACKEND_API_URL}/api/rag/conversations`);
+    const res = await authFetch(`${BACKEND_API_URL}/api/rag/conversations`);
     const data = await res.json();
     setConversations(data);
   };
@@ -273,14 +290,14 @@ export function AiChatInterface({
   };
 
   const loadMessages = async (id: string) => {
-    const res  = await authFetch(`${BACKEND_API_URL}/api/rag/messages/${id}`);
+    const res = await authFetch(`${BACKEND_API_URL}/api/rag/messages/${id}`);
     const data = await res.json();
     const formatted = data.map((m: any) => ({
-      id:      Math.random().toString(),
-      role:    m.role,
+      id: Math.random().toString(),
+      role: m.role,
       content: m.content,
       // Stored messages may not have sources; gracefully default to empty
-      law_sources:  m.law_sources  || [],
+      law_sources: m.law_sources || [],
       case_sources: m.case_sources || [],
     }));
     setConversationId(id);
@@ -288,7 +305,9 @@ export function AiChatInterface({
   };
 
   const deleteConversation = async (id: string) => {
-    await authFetch(`${BACKEND_API_URL}/api/rag/conversation/${id}`, { method: "DELETE" });
+    await authFetch(`${BACKEND_API_URL}/api/rag/conversation/${id}`, {
+      method: "DELETE",
+    });
     await loadConversations();
     if (conversationId === id) createNewChat();
   };
@@ -296,9 +315,9 @@ export function AiChatInterface({
   const renameConversation = async (id: string) => {
     if (!newTitle.trim()) return;
     await authFetch(`${BACKEND_API_URL}/api/rag/conversation/${id}`, {
-      method:  "PUT",
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ title: newTitle }),
+      body: JSON.stringify({ title: newTitle }),
     });
     setEditingChatId(null);
     setNewTitle("");
@@ -314,11 +333,13 @@ export function AiChatInterface({
       <div className="col-span-1">
         <Card className="h-[calc(100vh-7rem)] overflow-hidden">
           <div className="flex h-full">
-
             {/* ── LEFT: Conversations Sidebar ────────────────────────────── */}
             <div className="hidden md:flex md:w-56 lg:w-64 border-r bg-[#F8FAFC] flex-col h-full">
               <div className="p-3">
-                <Button className="w-full bg-[#1E3A8A] text-white" onClick={createNewChat}>
+                <Button
+                  className="w-full bg-[#1E3A8A] text-white"
+                  onClick={createNewChat}
+                >
                   + New Chat
                 </Button>
               </div>
@@ -331,15 +352,19 @@ export function AiChatInterface({
                       onClick={() => loadMessages(chat._id)}
                       className={`group flex items-center gap-2 px-3 py-2 mb-2 rounded-full
                                   cursor-pointer text-sm
-                                  ${conversationId === chat._id
-                                    ? "bg-[#1E3A8A] text-white"
-                                    : "hover:bg-gray-200"}`}
+                                  ${
+                                    conversationId === chat._id
+                                      ? "bg-[#1E3A8A] text-white"
+                                      : "hover:bg-gray-200"
+                                  }`}
                     >
                       <div className="relative flex items-center">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setActiveMenu(activeMenu === chat._id ? null : chat._id);
+                            setActiveMenu(
+                              activeMenu === chat._id ? null : chat._id,
+                            );
                           }}
                           className="opacity-0 group-hover:opacity-100 transition-opacity
                                      p-1 rounded hover:bg-gray-300"
@@ -371,7 +396,10 @@ export function AiChatInterface({
                         )}
                       </div>
 
-                      <div className="flex-1 truncate" onClick={() => loadMessages(chat._id)}>
+                      <div
+                        className="flex-1 truncate"
+                        onClick={() => loadMessages(chat._id)}
+                      >
                         {editingChatId === chat._id ? (
                           <input
                             className="w-full text-black px-1 bg-transparent outline-none"
@@ -379,7 +407,10 @@ export function AiChatInterface({
                             autoFocus
                             onChange={(e) => setNewTitle(e.target.value)}
                             onBlur={() => renameConversation(chat._id)}
-                            onKeyDown={(e) => { if (e.key === "Enter") renameConversation(chat._id); }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter")
+                                renameConversation(chat._id);
+                            }}
                           />
                         ) : (
                           <p className="truncate">{chat.title || "New Chat"}</p>
@@ -392,7 +423,6 @@ export function AiChatInterface({
 
             {/* ── RIGHT: Chat Area ───────────────────────────────────────── */}
             <div className="flex-1 flex flex-col h-full overflow-hidden">
-
               {/* Header */}
               <CardHeader className="border-b bg-gradient-to-r from-[#1E3A8A] to-[#1E3A8A]/80">
                 <div className="flex items-center gap-3">
@@ -407,7 +437,9 @@ export function AiChatInterface({
                     <Bot className="h-6 w-6 text-white" />
                   </div>
                   <div className="flex-1">
-                    <CardTitle className="text-white">AI Legal Assistant</CardTitle>
+                    <CardTitle className="text-white">
+                      AI Legal Assistant
+                    </CardTitle>
                   </div>
                   <Badge className="bg-white/20 text-white border-white/30">
                     {user?.role} View
@@ -423,7 +455,9 @@ export function AiChatInterface({
                       <div
                         key={message.id}
                         className={`flex gap-3 ${
-                          message.role === "user" ? "justify-end" : "justify-start"
+                          message.role === "user"
+                            ? "justify-end"
+                            : "justify-start"
                         }`}
                       >
                         {message.role === "assistant" && (
@@ -443,14 +477,20 @@ export function AiChatInterface({
                                 : "bg-gray-100"
                             }`}
                           >
-                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                            <p className="text-sm whitespace-pre-wrap">
+                              {message.content}
+                            </p>
                           </div>
 
                           {/* ── References (assistant only) ───────────────── */}
                           {message.role === "assistant" && (
                             <>
-                              <LawReferences  sources={message.law_sources  ?? []} />
-                              <CaseReferences sources={message.case_sources ?? []} />
+                              <LawReferences
+                                sources={message.law_sources ?? []}
+                              />
+                              <CaseReferences
+                                sources={message.case_sources ?? []}
+                              />
                             </>
                           )}
                         </div>
@@ -491,9 +531,14 @@ export function AiChatInterface({
                       placeholder="Ask your legal question..."
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
-                      onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+                      onKeyPress={(e) =>
+                        e.key === "Enter" && handleSendMessage()
+                      }
                     />
-                    <Button onClick={() => handleSendMessage()} className="bg-[#1E3A8A]">
+                    <Button
+                      onClick={() => handleSendMessage()}
+                      className="bg-[#1E3A8A]"
+                    >
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>
@@ -515,7 +560,10 @@ export function AiChatInterface({
                       >
                         + New Chat
                       </Button>
-                      <button onClick={() => setSidebarOpen(false)} className="ml-2 text-xl">
+                      <button
+                        onClick={() => setSidebarOpen(false)}
+                        className="ml-2 text-xl"
+                      >
                         ✕
                       </button>
                     </div>
@@ -523,7 +571,10 @@ export function AiChatInterface({
                       {conversations.map((chat) => (
                         <div
                           key={chat._id}
-                          onClick={() => { loadMessages(chat._id); setSidebarOpen(false); }}
+                          onClick={() => {
+                            loadMessages(chat._id);
+                            setSidebarOpen(false);
+                          }}
                           className="px-3 py-2 mb-2 rounded-full cursor-pointer hover:bg-gray-200"
                         >
                           {chat.title || "New Chat"}

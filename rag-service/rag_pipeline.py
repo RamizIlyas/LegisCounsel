@@ -127,6 +127,7 @@ class LocalRAG:
         law_metas:  list[dict],
         case_metas: list[dict],
         history:    list[dict] = None,
+        user_role: str = "client",
     ) -> str:
         history_text = ""
         if history:
@@ -150,43 +151,80 @@ class LocalRAG:
             header   = f"[{citation} | {court} | Outcome: {outcome} | {ctype}]"
             case_blocks.append(f"{header}\n{doc}")
         cases_context = "\n\n".join(case_blocks) if case_blocks else "No relevant cases found."
+        
+        if user_role == 'client':
+            prompt = f"""You are an expert legal assistant specialising in Pakistani law, assisting a client(normal person with little or no knowledge of laws and it's terms).
+                Use ONLY the information in the sections below to answer the question.
+                If the answer is not present in the provided context or conversation history,
+                say "Not found in provided context." Do NOT guess or introduce outside information.
 
-        prompt = f"""You are an expert legal assistant specialising in Pakistani law.
+                ============================
+                CONVERSATION HISTORY
+                ============================
+                {history_text if history_text else "(none)"}
 
-Use ONLY the information in the sections below to answer the question.
-If the answer is not present in the provided context or conversation history,
-say "Not found in provided context." Do NOT guess or introduce outside information.
+                ============================
+                RELEVANT LAW SECTIONS
+                ============================
+                {laws_context}
 
-============================
-CONVERSATION HISTORY
-============================
-{history_text if history_text else "(none)"}
+                ============================
+                RELEVANT CASE JUDGEMENTS
+                ============================
+                {cases_context}
 
-============================
-RELEVANT LAW SECTIONS (Pakistan Penal Code / CrPC)
-============================
-{laws_context}
+                ============================
+                QUESTION
+                ============================
+                {query}
 
-============================
-RELEVANT CASE JUDGEMENTS
-============================
-{cases_context}
+                ============================
+                INSTRUCTIONS
+                ============================
+                - Cite the specific law section(s) that apply (e.g. "Section 302 PPC").
+                - Reference at least one case judgement if relevant, quoting the citation and outcome while relating to the question.
+                - Explain in clear, most simplest language what the law says and how the courts have interpreted it.
+                - If the cases show conflicting outcomes, mention both and explain the distinction.
+                - Keep your answer structured: Law → Case precedent → Plain-language conclusion.
 
-============================
-QUESTION
-============================
-{query}
+                Answer:"""
+        else:
+            prompt = f"""You are an expert legal assistant specialising in Pakistani law, assisting a lawyer with legal research.
+                Use ONLY the information in the sections below to answer the question.
+                If the answer is not present in the provided context or conversation history,
+                say "Not found in provided context." Do NOT guess or introduce outside information.
 
-============================
-INSTRUCTIONS
-============================
-- Cite the specific law section(s) that apply (e.g. "Section 302 PPC").
-- Reference at least one case judgement if relevant, quoting the citation and outcome.
-- Explain in clear, simple language what the law says and how the courts have interpreted it.
-- If the cases show conflicting outcomes, mention both and explain the distinction.
-- Keep your answer structured: Law → Case precedent → Plain-language conclusion.
+                ============================
+                CONVERSATION HISTORY
+                ============================
+                {history_text if history_text else "(none)"}
 
-Answer:"""
+                ============================
+                RELEVANT LAW SECTIONS (Pakistan Penal Code / CrPC)
+                ============================
+                {laws_context}
+
+                ============================
+                RELEVANT CASE JUDGEMENTS
+                ============================
+                {cases_context}
+
+                ============================
+                QUESTION
+                ============================
+                {query}
+
+                ============================
+                INSTRUCTIONS
+                ============================
+                - Cite the specific law section(s) that apply (e.g. "Section 302 PPC").
+                - Reference at least one case judgement if relevant, quoting the citation and outcome.
+                - Explain how the law applies to the question, referencing any nuances in the cases.
+                - If the cases show conflicting outcomes, mention both and explain the distinction.
+                - Provide a structured answer that a lawyer can use for their research.
+
+                Answer:"""
+            
         return prompt
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -207,33 +245,55 @@ Answer:"""
 
     def rewrite_query(self, query: str, history: list[dict]) -> str:
         if not history:
-            return query
+            prompt = f"""Rewrite the question as a clear, concise, fully self-contained standalone question.
 
-        print("🔄 Rewriting follow-up query …")
-        history_text = ""
-        for msg in history[-3:]:
-            role = "User" if msg["role"] == "user" else "Assistant"
-            history_text += f"{role}: {msg['content']}\n"
+- Preserve the original intent.
+- Do not add or assume any extra context.
 
-        prompt = f"""Rewrite the user's follow-up question as a fully self-contained question.
-Only include context from the conversation that is directly relevant.
+Question:
+{query}
 
-Conversation:
+Standalone Question:"""
+
+            response = requests.post(
+                self.ollama_url,
+                json={"model": self.model, "prompt": prompt, "stream": False},
+                timeout=120,
+            )
+            rewritten = response.json()["response"].strip()
+            print(f"   → {rewritten}")
+            return rewritten
+        
+        else:
+        
+            print("🔄 Rewriting follow-up query …")
+            history_text = ""
+            for msg in history[-3:]:
+                role = "User" if msg["role"] == "user" else "Assistant"
+                history_text += f"{role}: {msg['content']}\n"
+
+            prompt = f"""Rewrite the follow-up question as a clear, concise, fully self-contained standalone question.
+
+- Use only relevant context from the conversation history.
+- Preserve the original intent.
+- Do not include unnecessary details or make assumptions.
+
+Conversation History:
 {history_text}
 
 Follow-up Question:
 {query}
 
-Rewritten standalone question:"""
+Standalone Question:"""
 
-        response = requests.post(
-            self.ollama_url,
-            json={"model": self.model, "prompt": prompt, "stream": False},
-            timeout=60,
-        )
-        rewritten = response.json()["response"].strip()
-        print(f"   → {rewritten}")
-        return rewritten
+            response = requests.post(
+                self.ollama_url,
+                json={"model": self.model, "prompt": prompt, "stream": False},
+                timeout=120,
+            )
+            rewritten = response.json()["response"].strip()
+            print(f"   → {rewritten}")
+            return rewritten
 
     # ─────────────────────────────────────────────────────────────────────────
     # Main entry point
@@ -244,6 +304,7 @@ Rewritten standalone question:"""
         self,
         query:           str,
         history:         list[dict] = None,
+        user_role:      str = "client",
         case_section:    str = None,
         case_outcome:    str = None,
         case_chunk_type: str = None,
@@ -288,6 +349,7 @@ Rewritten standalone question:"""
             law_metas  = law_metas,
             case_metas = case_metas,
             history    = history,
+            user_role = "client"
         )
         answer = self.generate(prompt)
 
@@ -352,7 +414,7 @@ if __name__ == "__main__":
             print("Goodbye.")
             break
 
-        result = rag.ask(query, history=history if history else None)
+        result = rag.ask(query, history=history if history else None, user_role="client")
 
         print(f"\n🤖 Assistant:\n{result['answer']}")
         print(f"\n📖 Law refs : {[s['section_number'] for s in result['law_sources']]}")
