@@ -1,3 +1,6 @@
+// ragRoutes.js
+// Handles routes related to Retrieval-Augmented Generation (RAG) interactions, 
+// including conversation management and message handling.
 import express from "express";
 const router = express.Router();
 import { askRAG} from "../../frontend/src/services/ragService.js";
