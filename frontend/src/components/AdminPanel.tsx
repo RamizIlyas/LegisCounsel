@@ -189,7 +189,7 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
         setError(null);
         const data = await adminApi.getStats();
         if (!cancelled) setStats(data);
-      } catch (err: any) {
+      } catch (err : any) {
         if (!cancelled) setError(err.message || "Failed to load stats");
       } finally {
         if (!cancelled) setLoading(false);
