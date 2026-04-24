@@ -15,70 +15,59 @@ import ragRoutes from "./routes/ragRoutes.js";
 import caseRoutes from "./routes/caseRoutes.js";
 import communicationRoutes from "./routes/chatCommunicationRoutes.js";
 import bookmarkRoutes from "./routes/bookmarkRoutes.js";
-
+import adminRoutes from "./routes/adminRoutes.js"; // ← NEW
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
- 
+
+// Ensure uploads directories exist
+["uploads", "uploads/laws", "uploads/cases"].forEach((dir) => {
+  const p = path.join(__dirname, dir);
+  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
+});
 
 const app = express();
 const httpServer = createServer(app);
 
-// ─── Connect DB ─────────────────────────────────────────────
-connectDB(); // your custom connection (preferred)
+// ─── Connect DB ──────────────────────────────────────────────────────────────
+connectDB();
 
-// ─── Socket.IO Setup ───────────────────────────────────────
-const io = new Server(httpServer, {
-  cors: { origin: "*" },
-});
-
-// Make io accessible in controllers
+// ─── Socket.IO ───────────────────────────────────────────────────────────────
+const io = new Server(httpServer, { cors: { origin: "*" } });
 app.set("io", io);
 
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
 
-  socket.on("joinConversation", (conversationId) => {
-    socket.join(conversationId);
-    console.log(`Joined room: ${conversationId}`);
-  });
-
-  socket.on("leaveConversation", (conversationId) => {
-    socket.leave(conversationId);
-    console.log(`Left room: ${conversationId}`);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("Socket disconnected:", socket.id);
-  });
+  socket.on("joinConversation", (id) => socket.join(id));
+  socket.on("leaveConversation", (id) => socket.leave(id));
+  socket.on("disconnect", () => console.log("Socket disconnected:", socket.id));
 });
 
-// ─── Middleware ────────────────────────────────────────────
+// ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
 
-// ─── Routes ───────────────────────────────────────────────
-// Serve uploaded files statically
+// ─── Static uploads ───────────────────────────────────────────────────────────
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/rag", ragRoutes);
 app.use("/api/cases", caseRoutes);
 app.use("/api/conversations", communicationRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
-// ─── Multer error handler ─────────────────────────────────────────────────────
-app.use((err, req, res, next) => {
+app.use("/api/admin", adminRoutes); // ← NEW — all admin CRUD lives here
+
+// ─── Error handler (Multer + general) ────────────────────────────────────────
+app.use((err, _req, res, _next) => {
   if (err.code === "LIMIT_FILE_SIZE")
     return res.status(400).json({ message: "File too large (max 20 MB)" });
-  if (err.message?.includes("not allowed"))
+  if (err.message?.includes("Only PDF"))
     return res.status(400).json({ message: err.message });
-  next(err);
+  console.error(err);
+  res.status(500).json({ message: "Internal server error" });
 });
 
-// ─── Start Server ─────────────────────────────────────────
+// ─── Start ────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-
-httpServer.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));

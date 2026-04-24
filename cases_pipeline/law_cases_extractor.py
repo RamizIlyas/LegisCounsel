@@ -457,7 +457,7 @@ class LawCasesDB:
         # Verify connection
         self.client.admin.command('ping')
         self.db = self.client[db_name]
-        self.cases       = self.db["cases"]
+        self.cases       = self.db["judgements"] # store parsed case documents in judgemnets collection
         self.failed_files = self.db["failed_extractions"]
 
     def upsert_case(self, doc: dict) -> str:
@@ -673,8 +673,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="MongoDB connection URI (default: mongodb://localhost:27017/)."
     )
     p.add_argument(
-        "--db", default="pakistan_law_db",
-        help="MongoDB database name (default: pakistan_law_db)."
+        "--db", default="LegisCounsel",
+        help="MongoDB database name (default: LegisCounsel)."
     )
     p.add_argument(
         "--no-skip", action="store_true",
