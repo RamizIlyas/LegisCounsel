@@ -6,6 +6,7 @@ const messageSchema = new mongoose.Schema(
     conversation_id: String,
     role: String,
     content: String,
+    responseTime: Number,
     case_sources: [
       {
         type: {
@@ -28,6 +29,7 @@ const messageSchema = new mongoose.Schema(
         chapter: String,
       },
     ],
+    
     timestamp: Date,
   },
   { collection: "messages" },

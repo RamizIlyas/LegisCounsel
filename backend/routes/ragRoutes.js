@@ -112,10 +112,14 @@ router.post("/ask", protect, async (req, res) => {
     }));
 
     // 2. Call RAG service
+    const start = performance.now();
     const result = await askRAG(question, history,user_role);
     const answer = result.answer;
     const case_sources = result.case_sources || [];
     const law_sources = result.law_sources || [];
+    const end = performance.now()
+    const responseTimeMs = end - start; 
+    console.log(`Response time: ${responseTimeMs} ms`);
     // console.log("RAG result:", result); // Debug log for RAG result
 
     // 3. Save user message
@@ -132,6 +136,7 @@ router.post("/ask", protect, async (req, res) => {
       content: answer,
       case_sources: case_sources,
       law_sources: law_sources,
+      responseTime: responseTimeMs,
       timestamp: new Date(),
     });
     // 5. Update conversation timestamp

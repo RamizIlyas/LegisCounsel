@@ -35,8 +35,10 @@ class LocalRAG:
         # ── Laws ChromaDB ─────────────────────────────────────────────────────
         print(f"  📖 Loading laws DB from '{laws_db_path}' …")
         laws_client = chromadb.PersistentClient(path=laws_db_path)
+        print("Available collections:")
+        print(laws_client.list_collections())
         self.laws_collection = laws_client.get_collection(
-            name="pakistan_penal_code",
+            name="laws_vector_db",
             embedding_function=embedding_function,
         )
         print(f"     ✓ {self.laws_collection.count()} law chunks loaded.")
@@ -44,6 +46,8 @@ class LocalRAG:
         # ── Cases ChromaDB ────────────────────────────────────────────────────
         print(f"  ⚖️  Loading cases DB from '{cases_db_path}' …")
         cases_client = chromadb.PersistentClient(path=cases_db_path)
+        print("Available collections:")
+        print(cases_client.list_collections())
         self.cases_collection = cases_client.get_collection(
             name="pakistan_law_cases",
             embedding_function=embedding_function,
@@ -235,7 +239,7 @@ class LocalRAG:
         response = requests.post(
             self.ollama_url,
             json={"model": self.model, "prompt": prompt, "stream": False},
-            timeout=120,
+            timeout=1200,
         )
         return response.json()["response"]
 
@@ -245,25 +249,7 @@ class LocalRAG:
 
     def rewrite_query(self, query: str, history: list[dict]) -> str:
         if not history:
-            prompt = f"""Rewrite the question as a clear, concise, fully self-contained standalone question.
-
-- Preserve the original intent.
-- Do not add or assume any extra context.
-
-Question:
-{query}
-
-Standalone Question:"""
-
-            response = requests.post(
-                self.ollama_url,
-                json={"model": self.model, "prompt": prompt, "stream": False},
-                timeout=120,
-            )
-            rewritten = response.json()["response"].strip()
-            print(f"   → {rewritten}")
-            return rewritten
-        
+            return query
         else:
         
             print("🔄 Rewriting follow-up query …")
@@ -289,7 +275,7 @@ Standalone Question:"""
             response = requests.post(
                 self.ollama_url,
                 json={"model": self.model, "prompt": prompt, "stream": False},
-                timeout=120,
+                timeout=1200,
             )
             rewritten = response.json()["response"].strip()
             print(f"   → {rewritten}")
