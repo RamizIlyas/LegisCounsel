@@ -22,3 +22,9 @@ To get started with LegisCounsel, clone the repository and refer to the document
 ## License
 
 See LICENSE file for details.
+
+# to add in .env
+MONGO_URI=mongodb://localhost:27017/
+MONGO_DB=LegisCounsel
+CHROMA_PATH=./cases_vector_db
+PYTHON_SERVICE_URL=http://localhost:8001   # in your Node .env

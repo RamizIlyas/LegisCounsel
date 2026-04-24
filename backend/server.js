@@ -16,7 +16,8 @@ import ragRoutes from "./routes/ragRoutes.js";
 import caseRoutes from "./routes/caseRoutes.js";
 import communicationRoutes from "./routes/chatCommunicationRoutes.js";
 import bookmarkRoutes from "./routes/bookmarkRoutes.js";
-import adminRoutes from "./routes/adminRoutes.js"; // ← NEW
+import adminRoutes from "./routes/adminRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -58,6 +59,7 @@ app.use("/api/cases", caseRoutes);
 app.use("/api/conversations", communicationRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
 app.use("/api/admin", adminRoutes); // ← all admin CRUD lives here
+app.use("/api/users", userRoutes); // ← user profile + password management routes
 
 // ─── Error handler (Multer + general) ────────────────────────────────────────
 app.use((err, _req, res, _next) => {
