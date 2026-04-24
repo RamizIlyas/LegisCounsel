@@ -18,6 +18,4 @@ export const askRAG = async (question, history,user_role) => {
     console.error("RAG Error:", error.message);
     throw error;
   }
-}
-
-// module.exports = { askRAG };
+};

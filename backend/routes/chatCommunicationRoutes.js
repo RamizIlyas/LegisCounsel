@@ -54,18 +54,18 @@ const router = express.Router();
 // All routes require a valid JWT
 router.use(protect);
 // ─── Start or get existing conversation between 2 users
-router.post("/start",                                     startOrGetConversation);
+router.post("/start",startOrGetConversation);
 // ─── Get all conversations for the current user
-router.get("/",                                           getConversations);
+router.get("/",getConversations);
 // ─── Get all messages in a conversation 
-router.get("/:conversationId/messages",                   getMessages);
+router.get("/:conversationId/messages",getMessages);
 // ─── Send a new message in a conversation 
-router.post("/:conversationId/messages",                  sendMessage);
+router.post("/:conversationId/messages",sendMessage);
 // ─── Send a file in a conversation 
 router.post("/:conversationId/upload", upload.single("file"), sendFile);
 // ─── Rename conversation (per-user)
-router.patch("/:conversationId/rename",                   renameConversation);
+router.patch("/:conversationId/rename",renameConversation);
 // ─── Soft-delete conversation for current user
-router.delete("/:conversationId",                         deleteConversation);
+router.delete("/:conversationId",deleteConversation);
 
 export default router;
