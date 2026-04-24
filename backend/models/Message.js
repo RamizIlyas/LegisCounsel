@@ -1,4 +1,7 @@
 // Message.js
+// When this model is imorted in its pasth message.js is written in lowercase. 
+// This is because the file is named message.js and not Message.js. 
+// The import statement is case-sensitive and must match the file name exactly.(BUt it has some issue here)
 import mongoose from "mongoose";
 
 const messageSchema = new mongoose.Schema(
@@ -29,7 +32,6 @@ const messageSchema = new mongoose.Schema(
         chapter: String,
       },
     ],
-    
     timestamp: Date,
   },
   { collection: "messages" },

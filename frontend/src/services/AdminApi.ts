@@ -53,7 +53,8 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
-  deleteUser: (id: string) => apiFetch(`/admin/users/${id}`, { method: "DELETE" }),
+  deleteUser: (id: string) =>
+    apiFetch(`/admin/users/${id}`, { method: "DELETE" }),
 
   // Laws
   getLaws: (params: Record<string, string> = {}) => {
@@ -61,10 +62,12 @@ export const adminApi = {
     return apiFetch(`/admin/laws?${q}`);
   },
   getLaw: (id: string) => apiFetch(`/admin/laws/${id}`),
-  createLaw: (formData: FormData) => apiFormData("/admin/laws", "POST", formData),
+  createLaw: (formData: FormData) =>
+    apiFormData("/admin/laws", "POST", formData),
   updateLaw: (id: string, formData: FormData) =>
     apiFormData(`/admin/laws/${id}`, "PUT", formData),
-  deleteLaw: (id: string) => apiFetch(`/admin/laws/${id}`, { method: "DELETE" }),
+  deleteLaw: (id: string) =>
+    apiFetch(`/admin/laws/${id}`, { method: "DELETE" }),
 
   // Cases
   getCases: (params: Record<string, string> = {}) => {
@@ -72,8 +75,13 @@ export const adminApi = {
     return apiFetch(`/admin/cases?${q}`);
   },
   getCase: (id: string) => apiFetch(`/admin/cases/${id}`),
-  createCase: (formData: FormData) => apiFormData("/admin/cases", "POST", formData),
+  createCase: (formData: FormData) =>
+    apiFormData("/admin/cases", "POST", formData),
   updateCase: (id: string, formData: FormData) =>
     apiFormData(`/admin/cases/${id}`, "PUT", formData),
-  deleteCase: (id: string) => apiFetch(`/admin/cases/${id}`, { method: "DELETE" }),
+  deleteCase: (id: string) =>
+    apiFetch(`/admin/cases/${id}`, { method: "DELETE" }),
+
+  //stats
+  getStats: () => apiFetch("/admin/stats"),
 };

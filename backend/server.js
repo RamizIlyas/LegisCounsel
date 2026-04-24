@@ -56,7 +56,7 @@ app.use("/api/rag", ragRoutes);
 app.use("/api/cases", caseRoutes);
 app.use("/api/conversations", communicationRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
-app.use("/api/admin", adminRoutes); // ← NEW — all admin CRUD lives here
+app.use("/api/admin", adminRoutes); // ← all admin CRUD lives here
 
 // ─── Error handler (Multer + general) ────────────────────────────────────────
 app.use((err, _req, res, _next) => {

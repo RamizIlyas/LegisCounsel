@@ -27,10 +27,16 @@ import {
   deleteCase,
 } from "../controllers/adminCaseController.js";
 
+import { getStats }
+  from "../controllers/adminStatsController.js";
+
+
 const router = express.Router();
 
 // All admin routes require authentication + admin role
 router.use(protect, adminOnly);
+// ── Stats (dashboard) ─────────────────────────────────────────────────────────
+router.get("/stats", getStats);
 
 // ── User routes ───────────────────────────────────────────────────────────────
 router.get("/users", getAllUsers);

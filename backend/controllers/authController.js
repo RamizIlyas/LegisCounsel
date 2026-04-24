@@ -6,10 +6,10 @@ const JWT_SECRET = "MY_SUPER_SECRET_KEY"; // Replace in production!
 
 // ----------------------- REGISTER -----------------------
 export const registerUser = async (req, res) => {
-    console.log("Signup API Hit", req.body);
+    // console.log("Signup API Hit", req.body);
   try {
     const { name, email, password, role } = req.body;
-    console.log("Received data:", { name, email, password, role });
+    // console.log("Received data:", { name, email, password, role });
 
     if (!name || !email || !password || !role)
       return res.status(400).json({ message: "All fields are required" });
@@ -23,14 +23,14 @@ export const registerUser = async (req, res) => {
     
     // Hash password
     const hashedPass = await bcrypt.hash(password, 10);
-    console.log("Password hashed");
+    // console.log("Password hashed");
     const newUser = await User.create({
       name,
       email,
       password: hashedPass,
       role,
     });
-    console.log("New user created:", newUser);
+    // console.log("New user created:", newUser);
 
     return res.status(201).json({
       message: "Signup successful",
