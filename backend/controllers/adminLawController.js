@@ -1,3 +1,4 @@
+// adminLawController.js
 import Law from "../models/Law.js";
 import fs from "fs";
 import path from "path";

@@ -1,3 +1,4 @@
+// adminRoutes.js
 import express from "express";
 import { protect, adminOnly } from "../controllers/authMiddleware.js";
 import { uploadLawPdf, uploadCasePdf } from "../config/multer.js"

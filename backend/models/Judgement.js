@@ -1,3 +1,4 @@
+// Judgement.js
 import mongoose from "mongoose";
 
 const judgementSchema = new mongoose.Schema(
