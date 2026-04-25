@@ -29,3 +29,8 @@ MONGO_DB=LegisCounsel
 LAW_CHROMA_PATH=./law_vector_db    # for law_extraction_service.py
 CHROMA_PATH=./cases_vector_db       # for case_extraction_service.py
 PYTHON_SERVICE_URL=http://localhost:8001   # in your Node .env
+EMAIL_USER= legis.counsell@gmail.com #email required to send reset password 
+EMAIL_PASS=xxxx xxxx xxxx xxxx 
+
+## Dependencies
+npm install nodemailer #in backend for forgot mail

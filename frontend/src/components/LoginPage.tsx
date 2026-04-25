@@ -4,12 +4,12 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 import type { Page, UserRole } from '../App';
 import { AuthIllustration } from './AuthIllustration';
 import { toast } from "sonner";
-import { useAuth} from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
+
 const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
 
 interface LoginPageProps {
@@ -20,68 +20,73 @@ interface LoginPageProps {
 export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  // const [role, setRole] = useState<'lawyer' | 'client' | 'admin'>('lawyer');// not needed in login as role is determined by backend
   const { login } = useAuth();
-  
-  
-  // Submit handler
+
+  // ── Forgot password state ──────────────────────────────────────────────────
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  // ── Login submit ───────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return toast.error("Please fill in all fields");
-    try{
-    const response = await fetch(`${BACKEND_API_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email:email.trim(), password }),
-    });
-    const data = await response.json();
 
-    if (!response.ok) {
-      // If login failed
-      return toast.error(data.message || "Invalid Credentials !");
+    try {
+      const response = await fetch(`${BACKEND_API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) return toast.error(data.message || "Invalid Credentials!");
+      if (!data.user || !data.token) return toast.error("Invalid server response");
+      if (!data.user.id || !data.user.email || !data.user.role || !data.user.name)
+        return toast.error("Incomplete user data received");
+
+      login(data.user, data.token);
+      setPassword('');
+      toast.success(`Welcome back, ${data.user.name}!`);
+      onLogin(data.user.role);
+    } catch (error) {
+      console.error(error);
+      toast.error("Server error. Please try again later.");
     }
+  };
 
-    // Validate response structure
-    if (!data.user || !data.token) {
-      console.error('Invalid response structure:', data);
-      return toast.error("Invalid server response");
+  // ── Forgot password submit ─────────────────────────────────────────────────
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) return toast.error("Please enter your email address");
+
+    setForgotLoading(true);
+    try {
+      const response = await fetch(`${BACKEND_API_URL}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim() }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) return toast.error(data.message || "Something went wrong");
+
+      toast.success("A new password has been sent to your email!");
+      setShowForgotModal(false);
+      setForgotEmail('');
+    } catch (error) {
+      console.error(error);
+      toast.error("Server error. Please try again later.");
+    } finally {
+      setForgotLoading(false);
     }
-
-    // ✅ Validate required user fields
-    if (!data.user.id || !data.user.email || !data.user.role || !data.user.name) {
-      console.error('Missing user fields:', data.user);
-      return toast.error("Incomplete user data received");
-    }
-
-    login(data.user, data.token); // ✅ CALL AUTH CONTEXT LOGIN
-
-    setPassword('');// ✅ Clear password field for security
-    
-    toast.success(`Welcome back, ${data.user.name}!`);// ✅ Show success message
-    toast.success(`Successfully logged in as ${data.user.role}`);
-    
-    onLogin(data.user.role);
-
-  } catch (error) {
-    console.error(error);
-    toast("Server error. Please try again later.");
-  }
-}
-
-  const handleGuestAccess = () => {
-    toast('Continuing as guest (Client view)');
-    onLogin('client');
   };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] grid md:grid-cols-2">
 
-      {/* Left side illustration */}
       <AuthIllustration />
 
-      {/* Right Side */}
       <div className="flex flex-col justify-center items-center p-8 md:p-12">
         <div className="w-full max-w-md">
 
@@ -105,7 +110,7 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
 
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
-                
+
                 <div>
                   <Label htmlFor="email">Email Address</Label>
                   <Input
@@ -130,52 +135,24 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
                   />
                 </div>
 
-                {/* <div>
-                  <Label htmlFor="role">I am a...</Label>
-                  <Select value={role} onValueChange={(r) => setRole(r as any)}>
-                    <SelectTrigger className="border-gray-300">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="lawyer">Lawyer / Legal Professional</SelectItem>
-                      <SelectItem value="client">Client</SelectItem>
-                      <SelectItem value="admin">Administrator</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div> */}
-
-                {/* Remember me */}
                 <div className="flex items-center justify-between text-sm">
                   <label className="flex items-center gap-2">
                     <input type="checkbox" className="rounded border-gray-300" />
                     <span className="text-gray-600">Remember me</span>
                   </label>
-                  <a className="text-[#1E3A8A] hover:underline" href="#">
+                  {/* ✅ Now opens the modal instead of linking nowhere */}
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotModal(true)}
+                    className="text-[#1E3A8A] hover:underline"
+                  >
                     Forgot password?
-                  </a>
+                  </button>
                 </div>
 
                 <Button type="submit" className="w-full bg-[#1E3A8A] hover:bg-[#1E3A8A]/90">
                   Sign In
                 </Button>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300" />
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white text-gray-500">OR</span>
-                  </div>
-                </div>
-
-                {/* <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-2 border-[#D4AF37] text-[#1E293B]"
-                  onClick={handleGuestAccess}
-                >
-                  Continue as Guest
-                </Button> */}
 
               </form>
 
@@ -188,12 +165,60 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
                   Sign up
                 </button>
               </div>
-
             </CardContent>
           </Card>
 
         </div>
       </div>
+
+      {/* ── Forgot Password Modal ─────────────────────────────────────────── */}
+      {showForgotModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setShowForgotModal(false)}   // click backdrop to dismiss
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm mx-4 relative"
+            onClick={(e) => e.stopPropagation()}       // prevent backdrop click inside
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setShowForgotModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <h2 className="text-xl font-semibold text-[#1E293B] mb-1">Reset Password</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Enter your registered email. We'll send a new temporary password instantly.
+            </p>
+
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div>
+                <Label htmlFor="forgot-email">Email Address</Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  className="border-gray-300 mt-1"
+                  autoFocus
+                />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={forgotLoading}
+                className="w-full bg-[#1E3A8A] hover:bg-[#1E3A8A]/90"
+              >
+                {forgotLoading ? "Sending..." : "Send New Password"}
+              </Button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
