@@ -26,5 +26,6 @@ See LICENSE file for details.
 # to add in .env
 MONGO_URI=mongodb://localhost:27017/
 MONGO_DB=LegisCounsel
-CHROMA_PATH=./cases_vector_db
+LAW_CHROMA_PATH=./law_vector_db    # for law_extraction_service.py
+CHROMA_PATH=./cases_vector_db       # for case_extraction_service.py
 PYTHON_SERVICE_URL=http://localhost:8001   # in your Node .env

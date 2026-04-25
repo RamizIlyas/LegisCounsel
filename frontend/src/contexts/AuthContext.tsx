@@ -7,6 +7,10 @@ interface User {
   email: string;
   role: string;
   initials?: string;
+  mobile?: string;
+  location?: string;
+  firm?: string;
+  status?: string;
 }
 
 interface AuthContextType {
