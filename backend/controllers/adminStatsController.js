@@ -1,6 +1,6 @@
 import User    from "../models/User.js";
 import Law     from "../models/Law.js";
-import Case    from "../models/Case.js";
+import Judgement from "../models/Judgement.js";
 import Message from "../models/message.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ export const getStats = async (req, res) => {
     const [totalUsers, totalLaws, totalCases, totalSearches] = await Promise.all([
       User.countDocuments(),
       Law.countDocuments(),
-      Case.countDocuments(),
+      Judgement.countDocuments(),
       Message.countDocuments({ role: "assistant" }),
     ]);
 

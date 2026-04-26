@@ -212,8 +212,8 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
     ? "Daily search activity — last 30 days"
     : "Monthly search activity — last 6 months";
   const responseDesc = isDaily
-    ? "Avg response time (seconds) — last 30 days"
-    : "Avg response time (seconds) — last 6 months";
+    ? "Mean response time (seconds) — last 30 days"
+    : "Mean response time (seconds) — last 6 months";
 
   return (
     <DashboardLayout
@@ -277,7 +277,7 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
               />
               <StatCard
                 icon={Activity}
-                label="Avg Model Response Time"
+                label="Mean Model Response Time"
                 value={`${stats.avgResponseSec}s`}
                 valueColor="text-[#1E3A8A]"
                 footer={
