@@ -1,5 +1,5 @@
 // SettingsPage.tsx
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DashboardLayout } from './DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -26,7 +26,7 @@ import {
 import type { Page, UserRole } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 
-const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
+const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:5000';
 
 interface SettingsPageProps {
   userRole: UserRole;
@@ -44,6 +44,15 @@ async function safeJson(res: Response): Promise<any> {
   } catch {
     return { message: `Unexpected server response (HTTP ${res.status})` };
   }
+}
+
+// ── Build auth headers at call-time so token is always fresh ─────────────────
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
 }
 
 // ── Inline alert ─────────────────────────────────────────────────────────────
@@ -107,10 +116,13 @@ function DeleteConfirmDialog({
   onConfirm,
   onCancel,
   loading,
+  // FIX #8: accept and display the error inside the dialog before it closes
+  error,
 }: {
   onConfirm: () => void;
   onCancel: () => void;
   loading: boolean;
+  error: string | null;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -128,6 +140,8 @@ function DeleteConfirmDialog({
           All your data — cases, messages, and documents — will be permanently deleted.
           Are you sure you want to continue?
         </p>
+        {/* FIX #8: error shown inside the dialog */}
+        {error && <Alert type="error" message={error} />}
         <div className="flex gap-3 pt-1">
           <Button
             variant="outline"
@@ -159,28 +173,47 @@ function DeleteConfirmDialog({
 export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: SettingsPageProps) {
   const { user, login, logout } = useAuth();
 
-  const token = localStorage.getItem('token');
-  const authHeaders = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`,
-  };
-
   // ── Profile ────────────────────────────────────────────────────────────────
+  // FIX #6: removed hardcoded demo fallbacks; start with empty/real values only
   const [profileData, setProfileData] = useState({
-    name:
-      user?.name ??
-      (userRole === 'lawyer' ? 'John Doe' : userRole === 'client' ? 'Alice Client' : 'Admin User'),
-    email:
-      user?.email ??
-      (userRole === 'lawyer' ? 'john.doe@law.com' : 'alice@email.com'),
-    phone: '',
-    location: '',
-    organization: userRole === 'lawyer' ? '' : 'N/A',
+    name: user?.name ?? '',
+    email: user?.email ?? '',
+    mobile: user?.mobile ?? '',
+    location: user?.location ?? '',
+    // FIX #1: was the string literal 'user?.firm' — now correctly reads the field
+    // FIX #7: 'firm' is kept in its own key so it can be excluded for non-lawyers
+    firm: userRole === 'lawyer' ? (user?.firm ?? '') : '',
   });
-  const [profileStatus, setProfileStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // FIX #2: sync form when user loads asynchronously after mount
+  useEffect(() => {
+    if (!user) return;
+    setProfileData({
+      name: user.name ?? '',
+      email: user.email ?? '',
+      mobile: user.mobile ?? '',
+      location: user.location ?? '',
+      firm: userRole === 'lawyer' ? (user.firm ?? '') : '',
+    });
+  }, [user, userRole]);
+
+  // FIX #10 (dirty-check): track the last-saved snapshot to enable Save only when dirty
+  const savedSnapshot = useRef(profileData);
+  const isProfileDirty =
+    JSON.stringify(profileData) !== JSON.stringify(savedSnapshot.current);
+
+  const [profileStatus, setProfileStatus] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
 
   const handleSaveProfile = async () => {
+    // FIX #5: guard against unauthenticated state
+    if (!user) {
+      setProfileStatus({ type: 'error', message: 'You must be logged in to update your profile.' });
+      return;
+    }
     if (!profileData.name.trim() || !profileData.email.trim()) {
       setProfileStatus({ type: 'error', message: 'Name and email are required.' });
       return;
@@ -190,21 +223,36 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
     try {
       const res = await fetch(`${BACKEND_API_URL}/api/users/profile`, {
         method: 'PUT',
-        headers: authHeaders,
+        // FIX #4: headers built at call-time so the token is always fresh
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           name: profileData.name.trim(),
           email: profileData.email.trim(),
-          mobile: profileData.phone.trim(),
-          location: profileData.location.trim(),
-          firm: profileData.organization.trim(),
+          mobile: profileData.mobile.trim() || undefined,
+          location: profileData.location.trim() || undefined,
+          // FIX #7: only send firm for lawyers; never send 'N/A'
+          ...(userRole === 'lawyer' && { firm: profileData.firm.trim() || undefined }),
         }),
       });
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data.message ?? 'Failed to update profile.');
+
+      const token = localStorage.getItem('token')!;
+      // FIX #3: pass all updated fields back into AuthContext, including mobile/location/firm
       login(
-        { id: user!.id, name: data.user.name, email: data.user.email, role: data.user.role },
-        token!
+        {
+          id: user.id,
+          name: data.user.name,
+          email: data.user.email,
+          role: data.user.role,
+          mobile: data.user.mobile,
+          location: data.user.location,
+          firm: data.user.firm,
+        },
+        token,
       );
+      // Update dirty-check snapshot
+      savedSnapshot.current = profileData;
       setProfileStatus({ type: 'success', message: 'Profile updated successfully.' });
     } catch (err: any) {
       setProfileStatus({ type: 'error', message: err.message ?? 'Something went wrong.' });
@@ -215,7 +263,10 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
 
   // ── Password ───────────────────────────────────────────────────────────────
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
-  const [passwordStatus, setPasswordStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [passwordStatus, setPasswordStatus] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
   const [passwordLoading, setPasswordLoading] = useState(false);
 
   const handleChangePassword = async () => {
@@ -224,7 +275,10 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
       return;
     }
     if (passwords.next.length < 8) {
-      setPasswordStatus({ type: 'error', message: 'New password must be at least 8 characters.' });
+      setPasswordStatus({
+        type: 'error',
+        message: 'New password must be at least 8 characters.',
+      });
       return;
     }
     if (passwords.next !== passwords.confirm) {
@@ -236,8 +290,12 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
     try {
       const res = await fetch(`${BACKEND_API_URL}/api/users/change-password`, {
         method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify({ currentPassword: passwords.current, newPassword: passwords.next }),
+        // FIX #4: fresh token at call-time
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          currentPassword: passwords.current,
+          newPassword: passwords.next,
+        }),
       });
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data.message ?? 'Failed to update password.');
@@ -261,16 +319,25 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
     try {
       const res = await fetch(`${BACKEND_API_URL}/api/users/profile`, {
         method: 'DELETE',
-        headers: authHeaders,
+        // FIX #4: fresh token at call-time
+        headers: getAuthHeaders(),
       });
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data.message ?? 'Failed to delete account.');
-      logout();   // clears localStorage + AuthContext
-      onLogout(); // navigate to login
+
+      // FIX #9: wrap post-delete navigation in its own try/catch so a logout
+      // error doesn't leave the user in a broken half-authenticated state
+      try {
+        logout();   // clears localStorage + AuthContext
+        onLogout(); // navigate to login
+      } catch {
+        // logout/navigation failed — force a hard redirect as a last resort
+        window.location.href = '/';
+      }
     } catch (err: any) {
       setDeleteError(err.message ?? 'Something went wrong.');
       setDeleteLoading(false);
-      setShowDeleteDialog(false);
+      // FIX #8: keep dialog open so the error is visible inside it
     }
   };
 
@@ -286,8 +353,10 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
       {showDeleteDialog && (
         <DeleteConfirmDialog
           onConfirm={handleDeleteAccount}
-          onCancel={() => setShowDeleteDialog(false)}
+          onCancel={() => { setDeleteError(null); setShowDeleteDialog(false); }}
           loading={deleteLoading}
+          // FIX #8: pass error into the dialog, not the card behind it
+          error={deleteError}
         />
       )}
 
@@ -318,8 +387,7 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                 <div className="flex items-center gap-6">
                   <Avatar className="h-24 w-24">
                     <AvatarFallback className="bg-[#1E3A8A] text-white text-2xl">
-                      {user?.initials ??
-                        (userRole === 'lawyer' ? 'JD' : userRole === 'client' ? 'AC' : 'AD')}
+                      {user?.initials ?? '??'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="space-y-1">
@@ -338,7 +406,9 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                       <Input
                         id="name"
                         value={profileData.name}
-                        onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                        onChange={(e) =>
+                          setProfileData({ ...profileData, name: e.target.value })
+                        }
                       />
                     </div>
                     <div className="space-y-2">
@@ -365,9 +435,9 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                         <Input
                           id="phone"
                           className="pl-10"
-                          value={profileData.phone}
+                          value={profileData.mobile}
                           onChange={(e) =>
-                            setProfileData({ ...profileData, phone: e.target.value })
+                            setProfileData({ ...profileData, mobile: e.target.value })
                           }
                         />
                       </div>
@@ -396,9 +466,10 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                         <Input
                           id="organization"
                           className="pl-10"
-                          value={profileData.organization}
+                          // FIX #7: use 'firm' key, not 'organization'
+                          value={profileData.firm}
                           onChange={(e) =>
-                            setProfileData({ ...profileData, organization: e.target.value })
+                            setProfileData({ ...profileData, firm: e.target.value })
                           }
                         />
                       </div>
@@ -413,7 +484,8 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                 <div className="flex justify-end">
                   <Button
                     onClick={handleSaveProfile}
-                    disabled={profileLoading}
+                    // FIX #10: disabled when nothing has changed or a save is in flight
+                    disabled={profileLoading || !isProfileDirty}
                     className="bg-[#1E3A8A] hover:bg-[#1E3A8A]/90 min-w-[130px]"
                   >
                     {profileLoading ? (
@@ -434,8 +506,8 @@ export function SettingsPage({ userRole, onNavigate, onLogout, onRoleSwitch }: S
                   This will permanently delete your account and all associated data.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {deleteError && <Alert type="error" message={deleteError} />}
+              <CardContent>
+                {/* FIX #8: error is now shown inside the dialog, not here */}
                 <Button
                   variant="destructive"
                   onClick={() => { setDeleteError(null); setShowDeleteDialog(true); }}

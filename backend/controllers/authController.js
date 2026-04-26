@@ -1,4 +1,4 @@
-// authController.js  
+// authController.js
 import nodemailer from "nodemailer";
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
@@ -8,7 +8,7 @@ const JWT_SECRET = "MY_SUPER_SECRET_KEY"; // Replace in production!
 
 // ----------------------- REGISTER -----------------------
 export const registerUser = async (req, res) => {
-    // console.log("Signup API Hit", req.body);
+  // console.log("Signup API Hit", req.body);
   try {
     const { name, email, password, role } = req.body;
     // console.log("Received data:", { name, email, password, role });
@@ -20,9 +20,8 @@ export const registerUser = async (req, res) => {
     const existing = await User.findOne({ email });
 
     if (existing)
-        return res.status(400).json({ message: "Email already registered" });
+      return res.status(400).json({ message: "Email already registered" });
 
-    
     // Hash password
     const hashedPass = await bcrypt.hash(password, 10);
     // console.log("Password hashed");
@@ -36,7 +35,7 @@ export const registerUser = async (req, res) => {
 
     return res.status(201).json({
       message: "Signup successful",
-      user: { id: newUser._id,name, email, role },
+      user: { id: newUser._id, name, email, role },
     });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error });
@@ -49,25 +48,31 @@ export const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user)
-      return res.status(400).json({ message: "Invalid email !" });
+    if (!user) return res.status(400).json({ message: "Invalid email !" });
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match)
-      return res.status(400).json({ message: "Invalid password !" });
+    if (!match) return res.status(400).json({ message: "Invalid password !" });
 
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     res.json({
       message: "Login successful",
       token,
-      user: { id: user._id,name:user.name, email: user.email, role: user.role },
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        mobile: user.mobile ?? '',
+        location: user.location ?? '',
+        firm: user.firm ?? '',
+        status: user.status ?? 'active'
+      },
     });
-
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
   }
@@ -76,51 +81,33 @@ export const loginUser = async (req, res) => {
 // ── helper: random 8-char alphanumeric password ──────────────────────────────
 const generateTempPassword = () => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  return Array.from({ length: 8 }, () =>
-    chars[Math.floor(Math.random() * chars.length)]
+  return Array.from(
+    { length: 8 },
+    () => chars[Math.floor(Math.random() * chars.length)],
   ).join("");
 };
 
 // ── Nodemailer transporter (configure once) ───────────────────────────────────
 // Store EMAIL_USER / EMAIL_PASS in your .env file — never hard-code credentials
-// const transporter = nodemailer.createTransport({
-//   service: "gmail",                        // swap to "outlook", "yahoo", etc. as needed
-//   auth: {
-//     user: process.env.EMAIL_USER,          // e.g. yourapp@gmail.com
-//     pass: process.env.EMAIL_PASS,          // Gmail App Password (not your account password)
-//   },
-// });
 
-// const transporter = nodemailer.createTransport({
-//   host: process.env.EMAIL_HOST,
-//   port: Number(process.env.EMAIL_PORT),
-//   secure: false,
-//   requireTLS: true,
-//   auth: {
-//     user: process.env.EMAIL_USER,
-//     pass: process.env.EMAIL_PASS,
-//   },
-// });
-
-// ── Lazy transporter — created on first use, not at module load ──────────────
 let transporter = null;
 
 const getTransporter = () => {
   if (!transporter) {
-    // console.log(`.env Email: ${process.env.EMAIL_USER}`);
-    // console.log(`.env Password: ${process.env.EMAIL_PASS}`);
-    // console.log(`.env EMAIL_HOST: ${process.env.EMAIL_HOST}`);
-    // console.log(`.env EMAIL_PORT: ${process.env.EMAIL_PORT}`);
-    transporter = nodemailer.createTransport({
-      host: "smtp-relay.brevo.com",   // hardcoded — no risk of undefined
-      port: 587,
-      secure: false,
-      requireTLS: true,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    console.log(`.env Email: ${process.env.EMAIL_USER}`);
+    console.log(`.env Password: ${process.env.EMAIL_PASS}`);
+  transporter = nodemailer.createTransport({
+  service: "gmail",                        // swap to "outlook", "yahoo", etc. as needed
+  auth: {
+    user: process.env.EMAIL_USER,          // e.g. yourapp@gmail.com
+    pass: process.env.EMAIL_PASS,          // Gmail App Password (not your account password)
+  },
+});
+
+  transporter.verify((error, success) => {
+    if (error) console.error("Transporter verify failed:", error);
+    else console.log("Normal SMTP ready:", success);
+  });
   }
   return transporter;
 };
@@ -137,7 +124,9 @@ export const forgotPassword = async (req, res) => {
 
     // Return the same message whether the email exists or not (security best practice)
     if (!user) {
-      return res.status(404).json({ message: "No account found with that email." });
+      return res
+        .status(404)
+        .json({ message: "No account found with that email." });
     }
 
     const tempPassword = generateTempPassword();
@@ -146,7 +135,7 @@ export const forgotPassword = async (req, res) => {
     // Update password in MongoDB
     user.password = hashedPassword;
     await user.save();
-    
+
     // Send email with the temporary password
     await getTransporter().sendMail({
       from: `"LegisCounsel Support" <${process.env.EMAIL_USER}>`,
@@ -173,7 +162,6 @@ export const forgotPassword = async (req, res) => {
     });
     console.log(`Temp Password : ${tempPassword}`);
     return res.json({ message: "A new password has been sent to your email." });
-
   } catch (error) {
     console.error("forgotPassword error:", error);
     return res.status(500).json({ message: "Server error. Please try again." });
