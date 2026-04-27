@@ -58,7 +58,7 @@ async function triggerExtraction(absoluteFilePath, mongoDocId, originalFilename,
 // ── GET all cases ─────────────────────────────────────────────────────────────
 export const getAllCases = async (req, res) => {
   try {
-    const { page = 1, limit = 20, search = "", category = "" } = req.query;
+    const { page = 1, limit = 10, search = "", category = "" } = req.query;
 
     const filter = {};
     if (search) {

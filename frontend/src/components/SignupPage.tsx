@@ -32,6 +32,7 @@ export function SignupPage({ onLogin, onNavigate }: SignupPageProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !name) return toast("Please fill in all fields");
+    if (password.length<8) return toast("Password must be at least 8 characters");
 
     try {
     const res = await axios.post(`${BACKEND_API_URL}/api/auth/signup`, {
@@ -95,7 +96,7 @@ export function SignupPage({ onLogin, onNavigate }: SignupPageProps) {
                   <Input
                     id="name"
                     type="text"
-                    placeholder="John Doe"
+                    placeholder="Muhammad Ali"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="border-gray-300"
@@ -107,7 +108,7 @@ export function SignupPage({ onLogin, onNavigate }: SignupPageProps) {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="lawyer@example.com"
+                    placeholder="user@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="border-gray-300"

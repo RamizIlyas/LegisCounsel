@@ -19,6 +19,7 @@ import {
   BookmarkCheck,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { toast } from "sonner";
 
 const BACKEND_API_URL =
   import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
@@ -379,7 +380,7 @@ export function AiChatInterface({
 
   const handleSendMessage = async (messageText?: string) => {
     const text = messageText || inputValue;
-    if (!text.trim()) return;
+    if (!text.trim()) return toast.error("Please enter a search query");
 
     const currentConversationId = await ensureConversation();
 

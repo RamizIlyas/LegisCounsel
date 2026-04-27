@@ -116,7 +116,7 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="lawyer@example.com"
+                    placeholder="user@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="border-gray-300"
@@ -140,7 +140,6 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
                     <input type="checkbox" className="rounded border-gray-300" />
                     <span className="text-gray-600">Remember me</span>
                   </label>
-                  {/* ✅ Now opens the modal instead of linking nowhere */}
                   <button
                     type="button"
                     onClick={() => setShowForgotModal(true)}
@@ -200,7 +199,7 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
                 <Input
                   id="forgot-email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder="user@example.com"
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
                   className="border-gray-300 mt-1"

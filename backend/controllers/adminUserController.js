@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 // ── GET all users ─────────────────────────────────────────────────────────────
 export const getAllUsers = async (req, res) => {
   try {
-    const { page = 1, limit = 20, search = "", role = "" } = req.query;
+    const { page = 1, limit = 10, search = "", role = "" } = req.query;
 
     const filter = {};
     if (search) {

@@ -51,7 +51,7 @@ async function triggerLawExtraction(absoluteFilePath, mongoDocId, originalFilena
 // ── GET all laws ──────────────────────────────────────────────────────────────
 export const getAllLaws = async (req, res) => {
   try {
-    const { page = 1, limit = 20, search = "", category = "" } = req.query;
+    const { page = 1, limit = 10, search = "", category = "" } = req.query;
 
     const filter = {};
     if (search) {
