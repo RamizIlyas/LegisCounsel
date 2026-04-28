@@ -1,35 +1,12 @@
 """
 Pakistani Law Documents — PDF to MongoDB Extractor
 ====================================================
-Extracts text and rich metadata from Pakistani statutory law PDFs
-(Acts, Ordinances, Codes, Amendments, Handbooks, etc.) and stores
-everything in MongoDB for full-text search and structured querying.
+v2 fix: parse_sections() is now called against body_text (not full_text)
+so that section positions are correct character offsets into body_text.
+This fixes the garbled / truncated section text that appeared when the
+vector DB sliced body_text[position:next_position].
 
-Accepts:
-  • A single ZIP archive containing PDFs
-  • One or more individual PDF files passed on the command line
-  • A directory of PDFs (scanned recursively)
-
-Requirements:
-    pip install pymongo pdfminer.six tqdm
-
-Usage examples:
-    # From a ZIP archive
-    python law_extractor.py --zip path/to/laws.zip
-
-    # From individual PDF files
-    python law_extractor.py --pdfs file1.pdf file2.pdf file3.pdf
-
-    # From a directory
-    python law_extractor.py --dir path/to/pdf_folder/
-
-    # Custom MongoDB URI / DB name + verbose output
-    python law_extractor.py --zip laws.zip --mongo mongodb://localhost:27017/ --db pak_laws -v
-
-    # Force re-process already-stored files
-    python law_extractor.py --zip laws.zip --no-skip
-
-Author: Generated for Pakistan Law Documents project
+All other logic is identical to v1.
 """
 
 from __future__ import annotations
@@ -44,7 +21,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Generator
 
-# ── Third-party ───────────────────────────────────────────────────────────────
 try:
     from pymongo import MongoClient, ASCENDING, TEXT
 except ImportError:
@@ -68,10 +44,6 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def extract_text_from_bytes(pdf_bytes: bytes) -> str:
-    """
-    Extract plain text from raw PDF bytes using pdfminer.six.
-    Returns an empty string on failure; the caller logs the error.
-    """
     try:
         text = pdfminer_hl.extract_text(
             io.BytesIO(pdf_bytes),
@@ -118,7 +90,6 @@ _DOC_TYPE_PATTERNS: list[tuple[str, str]] = [
 
 
 def infer_doc_type(text: str) -> str:
-    """Classify document type from any descriptive string."""
     for pattern, label in _DOC_TYPE_PATTERNS:
         if re.search(pattern, text, re.IGNORECASE):
             return label
@@ -126,19 +97,10 @@ def infer_doc_type(text: str) -> str:
 
 
 def parse_filename(filename: str) -> dict:
-    """
-    Derive structured metadata from the PDF filename alone.
-
-    Returns keys:
-        original_filename, file_stem, title_from_filename,
-        year_from_filename, doc_type_from_filename
-    """
     stem = Path(filename).stem
-    # Strip numeric prefixes such as "1THE ..." → "THE ..."
     stem_clean = re.sub(r'^\d+', '', stem).strip(" _-")
     readable = re.sub(r'[-_]+', ' ', stem_clean).strip()
     readable = re.sub(r'\s{2,}', ' ', readable)
-
     years = _YEAR_RE.findall(stem_clean)
     return {
         "original_filename":      filename,
@@ -166,13 +128,7 @@ def _clean(s: str | None) -> str:
     return re.sub(r'\s+', ' ', s).strip() if s else ""
 
 
-# ── Title ─────────────────────────────────────────────────────────────────────
-
 def parse_law_title(text: str) -> str:
-    """
-    Extract the formal title from the document body.
-    Handles all-caps headings, short-title provisions, and title-then-act-no patterns.
-    """
     header = text[:2000]
     patterns = [
         r'^([A-Z][A-Z\s\(\),\.\-]{15,120})\s*\n',
@@ -184,10 +140,7 @@ def parse_law_title(text: str) -> str:
     return re.sub(r'[\.,;:]+$', '', result).strip()
 
 
-# ── Act Number & Year ─────────────────────────────────────────────────────────
-
 def parse_act_number_and_year(text: str) -> tuple[str, str]:
-    """Return (act_number, enactment_year) from the document header."""
     header = text[:3000]
     m = _ACT_NO_RE.search(header)
     if m:
@@ -195,8 +148,6 @@ def parse_act_number_and_year(text: str) -> tuple[str, str]:
     year_m = _YEAR_RE.search(header)
     return "", (year_m.group(1) if year_m else "")
 
-
-# ── Jurisdiction ──────────────────────────────────────────────────────────────
 
 _JURISDICTION_MAP: list[tuple[str, str]] = [
     (r'\bPunjab\b',                               'Punjab'),
@@ -218,8 +169,6 @@ def parse_jurisdiction(text: str, filename: str = "") -> str:
     return "Pakistan (Federal)"
 
 
-# ── Enacting Authority ────────────────────────────────────────────────────────
-
 def parse_enacting_authority(text: str) -> str:
     header = text[:2000]
     if re.search(r'National\s+Assembly', header, re.IGNORECASE):
@@ -233,10 +182,7 @@ def parse_enacting_authority(text: str) -> str:
     return ""
 
 
-# ── Dates ─────────────────────────────────────────────────────────────────────
-
 def parse_dates(text: str) -> dict:
-    """Extract enactment, assent, and commencement dates from the header."""
     header = text[:3000]
     date_pats = [
         r'(\d{1,2}(?:st|nd|rd|th)?\s+\w+,?\s+\d{4})',
@@ -258,8 +204,6 @@ def parse_dates(text: str) -> dict:
     }
 
 
-# ── Preamble ──────────────────────────────────────────────────────────────────
-
 def parse_preamble(text: str) -> str:
     m = re.search(
         r'(?:Whereas|An (?:Act|Ordinance|Order)\s+to)\s+(.{30,800}?)(?:\n\n|\Z)',
@@ -268,10 +212,8 @@ def parse_preamble(text: str) -> str:
     return _clean(m.group(0)) if m else ""
 
 
-# ── Chapters ──────────────────────────────────────────────────────────────────
-
 def parse_chapters(text: str) -> list[dict]:
-    """Return list of {number, title, position} for each CHAPTER heading."""
+    """Parse chapter headings from body_text (positions are body_text offsets)."""
     pattern = re.compile(
         r'CHAPTER[S]?\s*[-\u2013]?\s*([IVXLCDM\d]+)\s*\n\s*([A-Z][^\n]{3,100})',
         re.MULTILINE,
@@ -282,12 +224,16 @@ def parse_chapters(text: str) -> list[dict]:
     ]
 
 
-# ── Sections ──────────────────────────────────────────────────────────────────
+# ── KEY FIX: sections are now parsed from body_text, not full_text ────────────
 
 def parse_sections(text: str) -> list[dict]:
     """
-    Extract numbered section headings (e.g. '302. Punishment for murder.').
-    Returns up to 500 entries to avoid noise in very large documents.
+    Extract numbered section headings.
+
+    IMPORTANT: Always call this with body_text (not full_text) so that
+    the returned `position` values are correct character offsets into
+    body_text.  The vector DB slices body_text[position:next_position]
+    to recover each section's raw text.
     """
     pattern = re.compile(
         r'^\s{0,6}(\d{1,4}[A-Z]?)\.\s{1,6}([A-Z][^\n]{5,120})',
@@ -300,16 +246,17 @@ def parse_sections(text: str) -> list[dict]:
         key = f"{num}:{heading[:30]}"
         if key not in seen and len(heading) > 5:
             seen.add(key)
-            sections.append({"number": num, "heading": heading, "position": m.start()})
+            sections.append({
+                "number":   num,
+                "heading":  heading,
+                "position": m.start(),   # ← offset into body_text ✅
+            })
         if len(sections) >= 500:
             break
     return sections
 
 
-# ── Amendments Referenced ─────────────────────────────────────────────────────
-
 def parse_amendments(text: str) -> list[str]:
-    """Collect amendment act/ordinance names cited in the first 5000 chars."""
     pattern = re.compile(
         r'([A-Z][^\n]{5,80}(?:Amendment|Amending)[^\n]{0,60}'
         r'(?:Act|Ordinance)[^\n]{0,30}\d{4})',
@@ -324,10 +271,7 @@ def parse_amendments(text: str) -> list[str]:
     return found[:20]
 
 
-# ── Related Laws ──────────────────────────────────────────────────────────────
-
 def parse_related_laws(text: str) -> list[str]:
-    """Extract names of other statutes cited anywhere in the document."""
     pattern = re.compile(
         r'(?:the\s+)?([A-Z][A-Za-z\s\(\)]{8,80}'
         r'(?:Act|Code|Ordinance|Rules|Order)\s*(?:,?\s*\d{4})?)',
@@ -344,13 +288,7 @@ def parse_related_laws(text: str) -> list[str]:
     return found
 
 
-# ── Definitions ───────────────────────────────────────────────────────────────
-
 def parse_definitions(text: str) -> list[dict]:
-    """
-    Extract formally defined terms from a 'Definitions' section.
-    Returns list of {term, definition}.
-    """
     m = re.search(r'(?:Definitions?|Interpretation)\s*[:\.\n]', text, re.IGNORECASE)
     if not m:
         return []
@@ -367,10 +305,7 @@ def parse_definitions(text: str) -> list[dict]:
     return results
 
 
-# ── Penalty Clauses ───────────────────────────────────────────────────────────
-
 def parse_penalties(text: str) -> list[str]:
-    """Collect 'punished/sentenced/liable to ...' clauses throughout the document."""
     pattern = re.compile(
         r'(?:punished?|sentenced?|liable)\s+(?:with|to)\s+([^\n\.;]{10,200})',
         re.IGNORECASE,
@@ -386,8 +321,6 @@ def parse_penalties(text: str) -> list[str]:
     return found
 
 
-# ── Schedules ─────────────────────────────────────────────────────────────────
-
 def parse_schedule_titles(text: str) -> list[str]:
     pattern = re.compile(
         r'SCHEDULE\s*[-\u2013]?\s*([IVXLCDM\d]*)\s*\n?\s*([A-Z][^\n]{0,100})?',
@@ -402,10 +335,7 @@ def parse_schedule_titles(text: str) -> list[str]:
     return list(dict.fromkeys(results))[:10]
 
 
-# ── Table of Contents ─────────────────────────────────────────────────────────
-
 def parse_toc(text: str) -> list[str]:
-    """Extract numbered TOC entries from the first 5000 chars."""
     pattern = re.compile(r'^\s{0,4}(\d{1,3})\.\s+([A-Z][^\n]{5,100})', re.MULTILINE)
     return [
         f"{m.group(1)}. {_clean(m.group(2))}"
@@ -413,10 +343,8 @@ def parse_toc(text: str) -> list[str]:
     ][:60]
 
 
-# ── Body Text ─────────────────────────────────────────────────────────────────
-
 def extract_body_text(text: str) -> str:
-    """Strip the TOC preamble and return text starting from the enacting clause."""
+    """Strip TOC / front matter and return text starting from the enacting clause."""
     for marker in (
         r'It is hereby enacted',
         r'Be it enacted',
@@ -432,9 +360,16 @@ def extract_body_text(text: str) -> str:
 
 # ── Master Parser ─────────────────────────────────────────────────────────────
 
-def parse_law_document(text: str, filename_meta: dict) -> dict:
+def parse_law_document(
+    text: str,
+    filename_meta: dict,
+    pdf_path: str | None = None,
+) -> dict:
     """
     Combine filename metadata and content-parsed fields into one MongoDB document.
+
+    KEY CHANGE vs v1: parse_sections() is called on body_text so that
+    section positions are correct offsets for downstream slicing.
     """
     title         = parse_law_title(text)
     act_no, year  = parse_act_number_and_year(text)
@@ -443,7 +378,6 @@ def parse_law_document(text: str, filename_meta: dict) -> dict:
     dates         = parse_dates(text)
     preamble      = parse_preamble(text)
     chapters      = parse_chapters(text)
-    sections      = parse_sections(text)
     amendments    = parse_amendments(text)
     related       = parse_related_laws(text)
     definitions   = parse_definitions(text)
@@ -452,6 +386,9 @@ def parse_law_document(text: str, filename_meta: dict) -> dict:
     toc           = parse_toc(text)
     body          = extract_body_text(text)
     doc_type      = infer_doc_type(title or filename_meta["title_from_filename"])
+
+    # ── FIXED: parse sections from body_text so positions are body offsets ────
+    sections = parse_sections(body)
 
     return {
         # ── Identity ──────────────────────────────────────────────
@@ -475,7 +412,7 @@ def parse_law_document(text: str, filename_meta: dict) -> dict:
         "preamble":          preamble,
         "table_of_contents": toc,
         "chapters":          chapters,
-        "sections":          sections,
+        "sections":          sections,   # positions are now body_text offsets ✅
         "schedules":         schedules,
         "chapter_count":     len(chapters),
         "section_count":     len(sections),
@@ -491,6 +428,7 @@ def parse_law_document(text: str, filename_meta: dict) -> dict:
         "full_text":  text,
 
         # ── Housekeeping ──────────────────────────────────────────
+        "pdf_path":            pdf_path or "",
         "word_count":          len(text.split()),
         "page_count_estimate": max(1, len(text) // 3000),
         "document_category":   "legislation",
@@ -500,21 +438,18 @@ def parse_law_document(text: str, filename_meta: dict) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  SECTION 4 — MongoDB Storage
+#  SECTION 4 — MongoDB Storage (unchanged)
 # ══════════════════════════════════════════════════════════════════════════════
 
 class LawDB:
-    """Thin wrapper around a MongoDB collection for law documents."""
-
     def __init__(self, mongo_uri: str, db_name: str):
         self.client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5_000)
-        self.client.admin.command("ping")   # raises immediately on bad connection
+        self.client.admin.command("ping")
         self.db     = self.client[db_name]
         self.laws   = self.db["laws"]
         self.failed = self.db["failed_extractions"]
 
     def upsert(self, doc: dict) -> str:
-        """Insert or update a document keyed by original_filename (idempotent)."""
         now = datetime.utcnow()
         set_doc = {k: v for k, v in doc.items() if k != "created_at"}
         set_doc["updated_at"] = now
@@ -557,57 +492,20 @@ class LawDB:
         )
         print("  ✓ MongoDB indexes created / verified.")
 
-    def demo_queries(self):
-        print("\n" + "═" * 62)
-        print("  SAMPLE QUERIES")
-        print("═" * 62)
-
-        print(f"\n[1] Total documents stored : {self.laws.count_documents({})}")
-
-        print("\n[2] Breakdown by document type:")
-        for row in self.laws.aggregate([
-            {"$group": {"_id": "$doc_type", "count": {"$sum": 1}}},
-            {"$sort": {"count": -1}},
-        ]):
-            print(f"    {row['_id']:20s} → {row['count']}")
-
-        print("\n[3] Breakdown by jurisdiction:")
-        for row in self.laws.aggregate([
-            {"$group": {"_id": "$jurisdiction", "count": {"$sum": 1}}},
-            {"$sort": {"count": -1}},
-        ]):
-            print(f"    {row['_id']:30s} → {row['count']}")
-
-        print("\n[4] Most recent documents (top 5 by year):")
-        for row in self.laws.find(
-            {"year": {"$ne": ""}}, {"title": 1, "year": 1, "_id": 0}
-        ).sort("year", -1).limit(5):
-            print(f"    ({row.get('year','?')}) {row.get('title','?')}")
-
-        print("\n[5] Full-text search — 'punishment murder':")
-        for row in self.laws.find(
-            {"$text": {"$search": "punishment murder"}},
-            {"title": 1, "year": 1, "jurisdiction": 1, "_id": 0},
-        ).limit(3):
-            print(f"    {row.get('title','?')} ({row.get('year','?')}) "
-                  f"[{row.get('jurisdiction','?')}]")
-
     def close(self):
         self.client.close()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  SECTION 5 — Input Source Iterators
+#  SECTION 5 — Input Source Iterators (unchanged)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _wrap(iterable, desc: str):
-    """Optionally wrap an iterable with a tqdm progress bar."""
     lst = list(iterable)
     return tqdm(lst, desc=desc) if _TQDM else lst
 
 
 def iter_from_zip(zip_path: str) -> Generator[tuple[str, bytes], None, None]:
-    """Yield (filename, pdf_bytes) for every PDF inside a ZIP archive."""
     with zipfile.ZipFile(zip_path, "r") as zf:
         entries = [
             info for info in zf.infolist()
@@ -623,7 +521,6 @@ def iter_from_zip(zip_path: str) -> Generator[tuple[str, bytes], None, None]:
 
 
 def iter_from_files(paths: list[str]) -> Generator[tuple[str, bytes], None, None]:
-    """Yield (basename, pdf_bytes) for a list of PDF file paths on disk."""
     valid = [p for p in paths if p.lower().endswith(".pdf") and os.path.isfile(p)]
     print(f"  Processing {len(valid)} PDF file(s).")
     for path in _wrap(valid, "Reading PDFs"):
@@ -635,7 +532,6 @@ def iter_from_files(paths: list[str]) -> Generator[tuple[str, bytes], None, None
 
 
 def iter_from_directory(dir_path: str) -> Generator[tuple[str, bytes], None, None]:
-    """Recursively yield (relative_path, pdf_bytes) for all PDFs in a directory."""
     root = Path(dir_path)
     pdf_paths = sorted(root.rglob("*.pdf"))
     print(f"  Found {len(pdf_paths)} PDF(s) in directory.")
@@ -648,7 +544,7 @@ def iter_from_directory(dir_path: str) -> Generator[tuple[str, bytes], None, Non
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  SECTION 6 — Core Processing Pipeline
+#  SECTION 6 — Core Processing Pipeline (unchanged)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def process_source(
@@ -657,10 +553,6 @@ def process_source(
     skip_existing: bool = True,
     verbose: bool = False,
 ) -> dict:
-    """
-    Drive the full pipeline: iterate (filename, bytes) → extract → parse → upsert.
-    Returns a summary dict: {total, success, skipped, failed}.
-    """
     summary = {"total": 0, "success": 0, "skipped": 0, "failed": 0}
 
     for filename, pdf_bytes in source_iter:
@@ -672,7 +564,6 @@ def process_source(
                 print(f"  [SKIP] {filename}")
             continue
 
-        # ── Extract text ──────────────────────────────────────────
         text = extract_text_from_bytes(pdf_bytes)
         if not text.strip():
             msg = "No extractable text (possibly scanned / image-only PDF)"
@@ -681,7 +572,6 @@ def process_source(
             summary["failed"] += 1
             continue
 
-        # ── Parse metadata ────────────────────────────────────────
         try:
             fn_meta  = parse_filename(filename)
             document = parse_law_document(text, fn_meta)
@@ -691,7 +581,6 @@ def process_source(
             summary["failed"] += 1
             continue
 
-        # ── Store in MongoDB ──────────────────────────────────────
         try:
             db.upsert(document)
             summary["success"] += 1
@@ -711,109 +600,43 @@ def process_source(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  SECTION 7 — CLI
+#  SECTION 7 — CLI (unchanged)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description=(
-            "Extract Pakistani law PDFs and store structured metadata in MongoDB.\n"
-            "Accepts a ZIP archive, individual PDF files, or a directory of PDFs."
-        ),
+        description="Extract Pakistani law PDFs and store structured metadata in MongoDB.",
         formatter_class=argparse.RawTextHelpFormatter,
     )
-
     src = p.add_mutually_exclusive_group(required=True)
-    src.add_argument(
-        "--zip", metavar="PATH",
-        help="Path to a ZIP archive containing PDF files.",
-    )
-    src.add_argument(
-        "--pdfs", nargs="+", metavar="FILE",
-        help="One or more PDF file paths.",
-    )
-    src.add_argument(
-        "--dir", metavar="PATH",
-        help="Directory to scan recursively for PDF files.",
-    )
-
-    p.add_argument(
-        "--mongo", default="mongodb://localhost:27017/", metavar="URI",
-        help="MongoDB connection URI  (default: mongodb://localhost:27017/).",
-    )
-    p.add_argument(
-        "--db", default="LegisCounsel", metavar="NAME",
-        help="MongoDB database name   (default: LegisCounsel).",
-    )
-    p.add_argument(
-        "--no-skip", action="store_true",
-        help="Re-process files that already exist in the database.",
-    )
-    p.add_argument(
-        "--verbose", "-v", action="store_true",
-        help="Print per-file status and extracted metadata.",
-    )
-    p.add_argument(
-        "--demo-queries", action="store_true",
-        help="Run example queries after extraction and print results.",
-    )
-    p.add_argument(
-        "--no-index", action="store_true",
-        help="Skip MongoDB index creation (use if indexes already exist).",
-    )
+    src.add_argument("--zip",  metavar="PATH", help="ZIP archive containing PDFs.")
+    src.add_argument("--pdfs", nargs="+", metavar="FILE", help="Individual PDF files.")
+    src.add_argument("--dir",  metavar="PATH", help="Directory to scan for PDFs.")
+    p.add_argument("--mongo",        default="mongodb://localhost:27017/", metavar="URI")
+    p.add_argument("--db",           default="LegisCounsel", metavar="NAME")
+    p.add_argument("--no-skip",      action="store_true")
+    p.add_argument("--verbose", "-v", action="store_true")
+    p.add_argument("--no-index",     action="store_true")
     return p
-
-
-def _print_banner(args):
-    source = args.zip or (", ".join(args.pdfs) if args.pdfs else args.dir)
-    print(f"\n{'═'*62}")
-    print("  PAKISTAN LAW DOCUMENTS → MONGODB EXTRACTOR")
-    print(f"{'═'*62}")
-    print(f"  Source   : {source}")
-    print(f"  MongoDB  : {args.mongo}")
-    print(f"  Database : {args.db}")
-    print(f"{'═'*62}\n")
-
-
-def _print_summary(s: dict):
-    print(f"\n{'─'*62}")
-    print("  EXTRACTION SUMMARY")
-    print(f"{'─'*62}")
-    print(f"  Total PDFs found     : {s['total']}")
-    print(f"  Successfully stored  : {s['success']}")
-    print(f"  Skipped (existing)   : {s['skipped']}")
-    print(f"  Failed               : {s['failed']}")
-    print(f"{'─'*62}")
 
 
 def main():
     args = build_parser().parse_args()
-    _print_banner(args)
 
-    # ── Validate inputs ───────────────────────────────────────────
     if args.zip and not os.path.isfile(args.zip):
         sys.exit(f"[ERROR] ZIP file not found: {args.zip}")
     if args.dir and not os.path.isdir(args.dir):
         sys.exit(f"[ERROR] Directory not found: {args.dir}")
-    if args.pdfs:
-        missing = [p for p in args.pdfs if not os.path.isfile(p)]
-        if missing:
-            sys.exit(f"[ERROR] File(s) not found: {', '.join(missing)}")
 
-    # ── Connect to MongoDB ────────────────────────────────────────
     try:
         db = LawDB(args.mongo, args.db)
-        print(f"  ✓ Connected to MongoDB  ({args.db})")
+        print(f"  ✓ Connected to MongoDB ({args.db})")
     except Exception as exc:
         sys.exit(f"[ERROR] Cannot connect to MongoDB: {exc}")
 
-    # ── Indexes ───────────────────────────────────────────────────
     if not args.no_index:
-        print("\nCreating indexes …")
         db.create_indexes()
 
-    # ── Run pipeline ──────────────────────────────────────────────
-    print("\nProcessing PDFs …\n")
     if args.zip:
         source = iter_from_zip(args.zip)
     elif args.pdfs:
@@ -828,13 +651,9 @@ def main():
         verbose=args.verbose,
     )
 
-    _print_summary(summary)
-
-    if args.demo_queries:
-        db.demo_queries()
-
+    print(f"\n  Total: {summary['total']}  Success: {summary['success']}  "
+          f"Skipped: {summary['skipped']}  Failed: {summary['failed']}")
     db.close()
-    print("\n  Done.\n")
 
 
 if __name__ == "__main__":

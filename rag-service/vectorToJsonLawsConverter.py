@@ -48,8 +48,8 @@ class VectorDBToJSONConverter:
         )
 
         self.collection = self.chroma_client.get_or_create_collection(
-            name=collection_name,
-            embedding_function=embedding_function_global
+            name=collection_name
+            # ,embedding_function=embedding_function_global
         )
 
         print(
