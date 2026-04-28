@@ -1,1 +1,11 @@
 .env
+# Vector DB (Chroma)
+rag-service/law_vector_db/
+*.bin
+*.sqlite3
+*.parquet
+*.pkl
+
+# Python
+__pycache__/
+*.pyc
