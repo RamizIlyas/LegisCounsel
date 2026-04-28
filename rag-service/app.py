@@ -195,7 +195,7 @@ def ask(query: Query):
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
-
+    print("App.py response :", result)
     return AskResponse(
         answer       = result["answer"],
         law_sources  = [LawSource(**s) for s in result["law_sources"]],

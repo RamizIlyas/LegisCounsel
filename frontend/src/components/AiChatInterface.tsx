@@ -17,6 +17,10 @@ import {
   Gavel,
   Bookmark,
   BookmarkCheck,
+  Wand2, // ← new: summarize icon
+  ChevronDown, // ← new: collapse icon
+  ChevronUp, // ← new: expand icon
+  Loader2, // ← new: loading spinner
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
@@ -24,13 +28,20 @@ import { toast } from "sonner";
 const BACKEND_API_URL =
   import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
 
+// Anthropic API – used for the "Summarize" feature
+const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+// Replace with your actual key (or load from import.meta.env.VITE_ANTHROPIC_API_KEY)
+const ANTHROPIC_API_KEY =
+  import.meta.env.VITE_ANTHROPIC_API_KEY || "YOUR_ANTHROPIC_API_KEY_HERE";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface LawSource {
   type: "law";
-  section_number: string;
-  section_title: string;
-  chapter: string;
+  law_title: string ;
+  section_num: string;
+  section_head: string;
+  citation: string;
 }
 
 interface CaseSource {
@@ -62,16 +73,12 @@ const authFetch = (url: string, options: RequestInit = {}) => {
   });
 };
 
-// ── Stable content hash (mirrors server logic) ────────────────────────────────
-// We use a simple djb2 variant; the server uses sha256 truncated to 32 chars.
-// Because we only use this client-side to key the bookmarked-set, and we store
-// the real server hash in the bookmark record, we just need something stable
-// per content string. We re-derive the server hash by storing it in the set
-// after the server responds.
+// ── Stable content hash ───────────────────────────────────────────────────────
+
 async function sha256Hex32(str: string): Promise<string> {
   const buf = await crypto.subtle.digest(
     "SHA-256",
-    new TextEncoder().encode(str)
+    new TextEncoder().encode(str),
   );
   return Array.from(new Uint8Array(buf))
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -116,10 +123,16 @@ function LawReferences({ sources }: { sources: LawSource[] }) {
                        rounded-md px-2 py-1 text-xs"
           >
             <span className="font-semibold text-[#1E3A8A]">
-              § {s.section_number}
+              § {s.law_title}
+            </span>
+            <span className="font-semibold text-[#1E3A8A]">
+              § {s.section_num}
             </span>
             <span className="text-gray-600 truncate max-w-[160px]">
-              {s.section_title}
+              {s.section_head}
+            </span>
+            <span className="text-gray-600 truncate max-w-[160px]">
+              {s.citation}
             </span>
           </div>
         ))}
@@ -145,7 +158,9 @@ function CaseReferences({ sources }: { sources: CaseSource[] }) {
           >
             <div className="w-0.5 self-stretch bg-[#D4AF37] rounded-full flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-800 truncate">{s.citation}</p>
+              <p className="font-semibold text-gray-800 truncate">
+                {s.citation}
+              </p>
               <p className="text-gray-500 truncate">{s.court}</p>
             </div>
             {s.outcome && (
@@ -179,7 +194,7 @@ interface BookmarkButtonProps {
     message: Message,
     hash: string,
     isCurrentlyBookmarked: boolean,
-    bookmarkId?: string
+    bookmarkId?: string,
   ) => void;
 }
 
@@ -240,6 +255,208 @@ function BookmarkButton({
   );
 }
 
+// ── Summarize button + inline panel ──────────────────────────────────────────
+//
+//  State machine per message:
+//    idle  →  loading  →  done (summary cached)
+//    done  → collapsed/expanded toggle
+//
+// The parent passes `onSummarize` which handles the actual API call and caches
+// results in a map so re-clicking is instant.
+
+interface SummarizeButtonProps {
+  message: Message;
+  summaryCache: Record<string, string>; // messageId → summary text
+  onSummarize: (message: Message) => Promise<void>;
+}
+
+function SummarizeButton({
+  message,
+  summaryCache,
+  onSummarize,
+}: SummarizeButtonProps) {
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const hasSummary = Boolean(summaryCache[message.id]);
+
+  const handleClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // If summary already exists just toggle visibility
+    if (hasSummary) {
+      setOpen((prev) => !prev);
+      return;
+    }
+
+    // Fetch summary for the first time
+    setLoading(true);
+    setOpen(false);
+    try {
+      await onSummarize(message);
+      setOpen(true); // auto-expand after fetch
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-1">
+      {/* Trigger button */}
+      <button
+        onClick={handleClick}
+        disabled={loading}
+        title="Summarize in simple terms with a real-world example"
+        className={`
+          flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-all
+          ${
+            hasSummary && open
+              ? "text-violet-600 hover:text-violet-800"
+              : "text-gray-400 hover:text-violet-600"
+          }
+          ${loading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
+        `}
+      >
+        {loading ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span>Summarizing…</span>
+          </>
+        ) : hasSummary && open ? (
+          <>
+            <ChevronUp className="h-3.5 w-3.5" />
+            <span>Hide Summary</span>
+          </>
+        ) : (
+          <>
+            <Wand2 className="h-3.5 w-3.5" />
+            <span>Simplify</span>
+          </>
+        )}
+      </button>
+
+      {/* Inline summary panel */}
+      {hasSummary && open && (
+        <div
+          className="mt-2 rounded-xl border border-violet-200 bg-violet-50
+                     px-4 py-3 text-xs text-gray-700 leading-relaxed shadow-sm
+                     animate-in fade-in slide-in-from-top-2 duration-200"
+        >
+          {/* Header */}
+          <p className="flex items-center gap-1.5 font-semibold text-violet-700 mb-2">
+            <Wand2 className="h-3.5 w-3.5" />
+            Plain-English Summary
+          </p>
+
+          {/* Parse the two sections out of the AI response */}
+          <SummaryBody text={summaryCache[message.id]} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Helper: renders the summary text with section highlighting ────────────────
+//
+//  The AI is prompted to reply with two clearly labelled sections:
+//    ## Simple Summary
+//    …
+//    ## Real-World Example
+//    …
+//  We split on those headings and render them with distinct styles.
+
+function SummaryBody({ text }: { text: string }) {
+  // Split on markdown-style headings the AI returns
+  const summaryMatch = text.match(/##\s*Simple Summary\s*([\s\S]*?)(?=##|$)/i);
+  const exampleMatch = text.match(
+    /##\s*Real.World Example\s*([\s\S]*?)(?=##|$)/i,
+  );
+
+  const summaryText = summaryMatch ? summaryMatch[1].trim() : null;
+  const exampleText = exampleMatch ? exampleMatch[1].trim() : null;
+
+  // Fallback: if AI didn't use headings, show raw text
+  if (!summaryText && !exampleText) {
+    return <p className="whitespace-pre-wrap">{text}</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {summaryText && (
+        <div>
+          <p className="font-medium text-violet-600 mb-0.5 text-[11px] uppercase tracking-wide">
+            📝 Summary
+          </p>
+          <p className="whitespace-pre-wrap text-gray-700">{summaryText}</p>
+        </div>
+      )}
+      {exampleText && (
+        <div className="border-t border-violet-200 pt-2">
+          <p className="font-medium text-amber-600 mb-0.5 text-[11px] uppercase tracking-wide">
+            🌍 Real-World Example
+          </p>
+          <p className="whitespace-pre-wrap text-gray-700">{exampleText}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Anthropic helper ──────────────────────────────────────────────────────────
+
+async function fetchSummaryFromAI(legalText: string): Promise<string> {
+  const systemPrompt = `You are a plain-language legal explainer. 
+When given a legal AI response, you do two things:
+1. Rewrite the core point in very simple, everyday language (2-4 sentences max).
+2. Give ONE concrete real-world example that a non-lawyer would immediately understand.
+
+Always structure your reply EXACTLY like this (keep the headings):
+
+## Simple Summary
+<your simple explanation here>
+
+## Real-World Example
+<your example here>
+
+Do not add any other text, disclaimers, or headings.`;
+
+  const response = await fetch(ANTHROPIC_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      // Required for browser-side calls (CORS)
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001", // fast + cheap for summaries
+      max_tokens: 512,
+      system: systemPrompt,
+      messages: [
+        {
+          role: "user",
+          content: `Please simplify this legal response:\n\n${legalText}`,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      (err as any)?.error?.message || `API error ${response.status}`,
+    );
+  }
+
+  const data = await response.json();
+  // Anthropic response shape: { content: [{ type: "text", text: "…" }] }
+  const textBlock = (
+    data.content as Array<{ type: string; text?: string }>
+  ).find((b) => b.type === "text");
+  return textBlock?.text ?? "Could not generate summary.";
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const initialMessages: Message[] = [
@@ -280,14 +497,15 @@ export function AiChatInterface({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // ── Bookmark state ──────────────────────────────────────────────────────────
-  // Set of content_hash strings the current user has bookmarked
   const [bookmarkedHashes, setBookmarkedHashes] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
-  // Map content_hash → MongoDB _id (needed for delete)
   const [bookmarkIdByHash, setBookmarkIdByHash] = useState<
     Record<string, string>
   >({});
+
+  // ── Summary cache: messageId → generated summary text ──────────────────────
+  const [summaryCache, setSummaryCache] = useState<Record<string, string>>({});
 
   const { user } = useAuth();
 
@@ -301,7 +519,7 @@ export function AiChatInterface({
           await res.json();
         setBookmarkedHashes(new Set(data.map((b) => b.content_hash)));
         setBookmarkIdByHash(
-          Object.fromEntries(data.map((b) => [b.content_hash, b._id]))
+          Object.fromEntries(data.map((b) => [b.content_hash, b._id])),
         );
       } catch {
         /* silently ignore – non-critical */
@@ -327,10 +545,9 @@ export function AiChatInterface({
       message: Message,
       hash: string,
       isCurrentlyBookmarked: boolean,
-      bookmarkId?: string
+      bookmarkId?: string,
     ) => {
       if (isCurrentlyBookmarked && bookmarkId) {
-        // ── Remove bookmark ──
         try {
           await authFetch(`${BACKEND_API_URL}/api/bookmarks/${bookmarkId}`, {
             method: "DELETE",
@@ -349,7 +566,6 @@ export function AiChatInterface({
           console.error("Failed to remove bookmark", err);
         }
       } else {
-        // ── Add bookmark ──
         try {
           const res = await authFetch(`${BACKEND_API_URL}/api/bookmarks`, {
             method: "POST",
@@ -373,7 +589,38 @@ export function AiChatInterface({
         }
       }
     },
-    [conversationId]
+    [conversationId],
+  );
+
+  // ── Summarize handler ─────────────────────────────────────────────────────
+  //
+  //  Called by <SummarizeButton> when no cached summary exists yet.
+  //  Fetches from Anthropic API and stores result in summaryCache.
+
+  const handleSummarizePrompt = useCallback(
+    async (message: Message) => {
+      // Guard: already cached (shouldn't reach here, but just in case)
+      if (summaryCache[message.id]) return;
+
+      try {
+        const summary = await fetchSummaryFromAI(message.content);
+        setSummaryCache((prev) => ({ ...prev, [message.id]: summary }));
+      } catch (err: any) {
+        console.error("Summarize error:", err);
+        toast.error(
+          err?.message?.includes("401")
+            ? "Invalid Anthropic API key. Check VITE_ANTHROPIC_API_KEY."
+            : "Failed to generate summary. Please try again.",
+        );
+        // Store an error placeholder so the button doesn't spin forever
+        setSummaryCache((prev) => ({
+          ...prev,
+          [message.id]:
+            "## Simple Summary\nCould not generate summary.\n\n## Real-World Example\nPlease try again.",
+        }));
+      }
+    },
+    [summaryCache],
   );
 
   // ── Send message ────────────────────────────────────────────────────────────
@@ -535,7 +782,7 @@ export function AiChatInterface({
                           onClick={(e) => {
                             e.stopPropagation();
                             setActiveMenu(
-                              activeMenu === chat._id ? null : chat._id
+                              activeMenu === chat._id ? null : chat._id,
                             );
                           }}
                           className="opacity-0 group-hover:opacity-100 transition-opacity
@@ -651,7 +898,7 @@ export function AiChatInterface({
                             </p>
                           </div>
 
-                          {/* References + bookmark (assistant only) */}
+                          {/* References + action buttons (assistant only) */}
                           {message.role === "assistant" && (
                             <>
                               <LawReferences
@@ -660,15 +907,25 @@ export function AiChatInterface({
                               <CaseReferences
                                 sources={message.case_sources ?? []}
                               />
-                              {/* Don't show bookmark on the static greeting */}
+
+                              {/* Bookmark + Summarize – hidden for the static greeting */}
                               {message.id !== "1" && (
-                                <BookmarkButton
-                                  message={message}
-                                  conversationId={conversationId}
-                                  bookmarkedHashes={bookmarkedHashes}
-                                  bookmarkIdByHash={bookmarkIdByHash}
-                                  onToggle={handleBookmarkToggle}
-                                />
+                                <div className="flex items-start gap-2 flex-wrap">
+                                  <BookmarkButton
+                                    message={message}
+                                    conversationId={conversationId}
+                                    bookmarkedHashes={bookmarkedHashes}
+                                    bookmarkIdByHash={bookmarkIdByHash}
+                                    onToggle={handleBookmarkToggle}
+                                  />
+                                  {user?.role !== "lawyer" && (
+                                    <SummarizeButton
+                                      message={message}
+                                      summaryCache={summaryCache}
+                                      onSummarize={handleSummarizePrompt}
+                                    />
+                                  )}
+                                </div>
                               )}
                             </>
                           )}
@@ -835,6 +1092,14 @@ export function AiChatInterface({
               <li className="flex gap-2">
                 <span className="text-[#1E3A8A]">•</span>
                 <span>Save important responses with the bookmark button</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="text-[#1E3A8A]">•</span>
+                {/* Updated to mention the new feature */}
+                <span>
+                  Hit <strong>Simplify</strong> to get a plain-English summary +
+                  real-world example
+                </span>
               </li>
               <li className="flex gap-2">
                 <span className="text-[#1E3A8A]">•</span>

@@ -42,6 +42,13 @@ from __future__ import annotations
 import re
 from typing import Optional
 
+# ── NEW: OpenAI + env loading (replaces bare `requests` for LLM calls) ────────
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()  # reads GPT_API_KEY (and any other vars) from .env
+
 import requests
 import chromadb
 from chromadb.utils import embedding_functions
@@ -56,7 +63,7 @@ embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
     normalize_embeddings=True,
 )
 print("✅ Embedding model ready.")
-
+print("GPT Api Key loaded" if os.environ["GPT_API_KEY"] else "API Key Not loaded")
 _SECTION_TYPES = {"section", "section_heading", "section_summary"}
 
 # ── Regex to detect explicit section-number queries ───────────────────────────
@@ -85,7 +92,8 @@ class LocalRAG:
         cases_db_path: str = "./cases_vector_db",
         mongo_uri:     str = "mongodb://localhost:27017/",
         mongo_db:      str = "LegisCounsel",
-        ollama_model:  str = "qwen2.5:3b",
+        # ── CHANGED: model now refers to the OpenAI model name ────────────────
+        ollama_model:  str = "gpt-5",
         laws_k:        int = 5,
         cases_k:       int = 3,
         rerank:        bool = True,
@@ -97,6 +105,9 @@ class LocalRAG:
         self.cases_k      = cases_k
         self.rerank       = rerank
         self.n_candidates = n_candidates
+        # ── CHANGED: store model name; build OpenAI client from env key ───────
+        self.model  = ollama_model
+        self.client = OpenAI(api_key=os.environ["GPT_API_KEY"])
 
         # ── Law vector DB ─────────────────────────────────────────────────────
         print(f"  📖 Loading laws vector DB from '{laws_db_path}' …")
@@ -121,20 +132,17 @@ class LocalRAG:
         self._laws_col     = self._mongo_client[mongo_db]["laws"]
         print("     ✓ MongoDB ready.")
 
-        # ── Ollama ────────────────────────────────────────────────────────────
-        self.ollama_url = "http://localhost:11434/api/generate"
-        self.model      = ollama_model
-
+        # ── CHANGED: Verify OpenAI connectivity with a cheap test call ────────
         print("🔥 Warming up LLM …")
         try:
-            requests.post(
-                self.ollama_url,
-                json={"model": self.model, "prompt": "Hello", "stream": False},
-                timeout=30,
+            self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": "Hello"}],
+                max_completion_tokens=5,
             )
             print("  ✓ LLM ready.")
         except Exception as exc:
-            print(f"  ⚠️  Could not reach Ollama ({exc}). Make sure it is running.")
+            print(f"  ⚠️  Could not reach OpenAI ({exc}). Check your GPT_API_KEY.")
 
         print("✅ RAG pipeline ready.\n")
 
@@ -284,26 +292,33 @@ class LocalRAG:
         # Truncate very long sections to avoid context overflow
         snippet = section_text[:2000]
 
-        prompt = f"""You are a senior Pakistani law expert writing a legal reference guide.
-
-Summarize the following section of {law_title} in 2 to 4 clear, legally precise sentences.
-- State what the section establishes, prohibits, or defines.
-- Mention the key legal consequence or right if applicable.
-- Do NOT add information that is not in the text below.
-- Write in formal legal English.
-
-Section {section_num} — {section_head}:
-{snippet}
-
-Summary:"""
+        # ── CHANGED: OpenAI chat format (system + user messages) ──────────────
+        system_msg = "You are a senior Pakistani law expert writing a legal reference guide."
+        user_msg   = (
+            f"Summarize the following section of {law_title} in 2 to 4 clear, "
+            f"legally precise sentences.\n"
+            f"- State what the section establishes, prohibits, or defines.\n"
+            f"- Mention the key legal consequence or right if applicable.\n"
+            f"- Do NOT add information that is not in the text below.\n"
+            f"- Write in formal legal English.\n\n"
+            f"Section {section_num} — {section_head}:\n{snippet}\n\nSummary:"
+        )
 
         try:
-            response = requests.post(
-                self.ollama_url,
-                json={"model": self.model, "prompt": prompt, "stream": False},
-                timeout=120,
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user",   "content": user_msg},
+                ],
+                # max_tokens=300
+                max_completion_tokens=3000,
+                reasoning_effort="medium"
+                # ,temperature=0.2,
             )
-            return response.json()["response"].strip()
+            content = response.choices[0].message.content
+            print("Content : ",content)
+            return content.strip() if content else ""
         except Exception as exc:
             print(f"  ⚠️  Summary generation failed for Section {section_num}: {exc}")
             return ""
@@ -537,8 +552,7 @@ Summary:"""
                 "use in legal proceedings."
             )
 
-        return f"""You are an expert legal assistant specialising in Pakistani law, \
-assisting {role_desc}.
+        return f"""You are an expert legal assistant specialising in Pakistani law, \ assisting {role_desc}.
 Use ONLY the information in the sections below to answer the question.
 If the answer is not present in the provided context, say \
 "Not found in provided context." Do NOT guess or add outside information.
@@ -575,18 +589,33 @@ Answer:"""
     #  LLM Generation
     # ─────────────────────────────────────────────────────────────────────────
 
+    # ── CHANGED: uses OpenAI chat completions instead of Ollama ───────────────
     def generate(self, prompt: str) -> str:
-        response = requests.post(
-            self.ollama_url,
-            json={"model": self.model, "prompt": prompt, "stream": False},
-            timeout=1200,
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert legal assistant specialising in Pakistani law. "
+                        "Answer strictly from the provided context."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            max_completion_tokens=4096,
+            reasoning_effort="medium"
+            # ,temperature=0.2,
         )
-        return response.json()["response"]
+        content = response.choices[0].message.content
+        print("Content : ",content)
+        return content.strip() if content else ""
 
     # ─────────────────────────────────────────────────────────────────────────
     #  Query Rewriting
     # ─────────────────────────────────────────────────────────────────────────
 
+    # ── CHANGED: uses OpenAI chat completions instead of Ollama ───────────────
     def rewrite_query(self, query: str, history: Optional[list[dict]]) -> str:
         if not history:
             return query
@@ -597,26 +626,25 @@ Answer:"""
             role = "User" if msg["role"] == "user" else "Assistant"
             history_text += f"{role}: {msg['content']}\n"
 
-        prompt = f"""Rewrite the follow-up question as a clear, concise, \
-fully self-contained standalone question.
-- Use only relevant context from the conversation history.
-- Preserve the original intent exactly.
-- Do not add assumptions or unnecessary detail.
-
-Conversation History:
-{history_text}
-
-Follow-up Question:
-{query}
-
-Standalone Question:"""
-
-        response = requests.post(
-            self.ollama_url,
-            json={"model": self.model, "prompt": prompt, "stream": False},
-            timeout=120,
+        user_msg = (
+            "Rewrite the follow-up question as a clear, concise, "
+            "fully self-contained standalone question.\n"
+            "- Use only relevant context from the conversation history.\n"
+            "- Preserve the original intent exactly.\n"
+            "- Do not add assumptions or unnecessary detail.\n\n"
+            f"Conversation History:\n{history_text}\n"
+            f"Follow-up Question:\n{query}\n\n"
+            "Standalone Question:"
         )
-        rewritten = response.json()["response"].strip()
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": user_msg}],
+            max_completion_tokens=800,
+            reasoning_effort="medium"
+            # ,temperature=0.0,
+        )
+        rewritten = response.choices[0].message.content.strip()
         print(f"   → {rewritten}")
         return rewritten
 
@@ -728,7 +756,7 @@ Standalone Question:"""
             user_role  = user_role,
         )
         answer = self.generate(prompt)
-
+        print("Answer : ",answer)
         # ── 6. Structure law sources ──────────────────────────────────────────
         seen_law_keys: set[str] = set()
         law_sources:   list[dict] = []
@@ -792,7 +820,10 @@ Standalone Question:"""
                 "outcome":  m.get("outcome", ""),
                 "sections": sections_str,
             })
-
+        print("->\nanswer :",answer,
+            "\nlaw_sources",law_sources,
+            "\ncase_sources",     case_sources,
+            "\nsection_detected", sec_num)
         return {
             "answer":           answer,
             "law_sources":      law_sources,
@@ -832,7 +863,7 @@ if __name__ == "__main__":
         if result.get("section_detected"):
             print(f"\n🔢 Section matched: {result['section_detected']}")
 
-        print("\n📖 Law refs:")
+        print("\n📖 Law refs:", result["law_sources"])
         for s in result["law_sources"]:
             print(f"   [{s['chunk_type']:16s}] {s['citation']}")
             if s.get("summary"):
