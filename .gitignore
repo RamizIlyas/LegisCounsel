@@ -1,7 +1,8 @@
 .env
 # Vector DB (Chroma)
 rag-service/law_vector_db
-
+# Frontend
+frontend/.env
 # Python
 rag-service/__pycache__/
 *.pyc

@@ -111,7 +111,7 @@ export const askRAGController = async (req, res) => {
     const answer = result.answer;
     const case_sources = result.case_sources || [];
     const law_sources = result.law_sources || [];
-    console.log("\n LAw Sources in Rag controller :",law_sources)
+    // console.log("\n LAw Sources in Rag controller :",law_sources)
     const end = performance.now()
     const responseTimeMs = end - start; 
     // console.log(`Response time: ${responseTimeMs} ms`);

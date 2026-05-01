@@ -24,18 +24,19 @@ import {
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
+import OpenAI from "openai";
 
 const BACKEND_API_URL =
   import.meta.env.VITE_BACKEND_API_URL || "http://localhost:5000";
 
 // Anthropic API – used for the "Summarize" feature
-const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+// const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 // Replace with your actual key (or load from import.meta.env.VITE_ANTHROPIC_API_KEY)
-const ANTHROPIC_API_KEY =
-  import.meta.env.VITE_ANTHROPIC_API_KEY || "YOUR_ANTHROPIC_API_KEY_HERE";
+const GPT_API_KEY =
+  import.meta.env.VITE_GPT_API_KEY;
+
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
 interface LawSource {
   type: "law";
   law_title: string ;
@@ -211,7 +212,7 @@ function BookmarkButton({
   useEffect(() => {
     sha256Hex32(message.content).then(setHash);
   }, [message.content]);
-
+  
   if (!hash) return null;
 
   const isBookmarked = bookmarkedHashes.has(hash);
@@ -402,9 +403,13 @@ function SummaryBody({ text }: { text: string }) {
   );
 }
 
-// ── Anthropic helper ──────────────────────────────────────────────────────────
+// ── GPT Summarizer ──────────────────────────────────────────────────────────
 
 async function fetchSummaryFromAI(legalText: string): Promise<string> {
+  const openai = new OpenAI({
+  apiKey: GPT_API_KEY, // Replace with your actual key
+  dangerouslyAllowBrowser: true
+});
   const systemPrompt = `You are a plain-language legal explainer. 
 When given a legal AI response, you do two things:
 1. Rewrite the core point in very simple, everyday language (2-4 sentences max).
@@ -420,41 +425,23 @@ Always structure your reply EXACTLY like this (keep the headings):
 
 Do not add any other text, disclaimers, or headings.`;
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      // Required for browser-side calls (CORS)
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001", // fast + cheap for summaries
-      max_tokens: 512,
-      system: systemPrompt,
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4.1-mini", // gpt-5 is not a valid public model (yet)
       messages: [
-        {
-          role: "user",
-          content: `Please simplify this legal response:\n\n${legalText}`,
-        },
+        { role: "system", content: systemPrompt },
+        { role: "user", content: legalText },
       ],
-    }),
-  });
+    });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(
-      (err as any)?.error?.message || `API error ${response.status}`,
+    return (
+      response.choices?.[0]?.message?.content ??
+      "Could not generate summary."
     );
+  } catch (error: any) {
+    console.error("OpenAI Error:", error);
+    throw new Error(error?.message || "AI request failed");
   }
-
-  const data = await response.json();
-  // Anthropic response shape: { content: [{ type: "text", text: "…" }] }
-  const textBlock = (
-    data.content as Array<{ type: string; text?: string }>
-  ).find((b) => b.type === "text");
-  return textBlock?.text ?? "Could not generate summary.";
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────

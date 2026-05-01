@@ -317,7 +317,6 @@ class LocalRAG:
                 # ,temperature=0.2,
             )
             content = response.choices[0].message.content
-            print("Content : ",content)
             return content.strip() if content else ""
         except Exception as exc:
             print(f"  ⚠️  Summary generation failed for Section {section_num}: {exc}")
@@ -608,7 +607,6 @@ Answer:"""
             # ,temperature=0.2,
         )
         content = response.choices[0].message.content
-        print("Content : ",content)
         return content.strip() if content else ""
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -820,10 +818,6 @@ Answer:"""
                 "outcome":  m.get("outcome", ""),
                 "sections": sections_str,
             })
-        print("->\nanswer :",answer,
-            "\nlaw_sources",law_sources,
-            "\ncase_sources",     case_sources,
-            "\nsection_detected", sec_num)
         return {
             "answer":           answer,
             "law_sources":      law_sources,
