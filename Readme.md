@@ -17,6 +17,3 @@ This project aims to simplify the process of interpreting legal documents and pr
 
 To get started with LegisCounsel, clone the repository and refer to the documentation for setup instructions and usage guidelines.
 
-## License
-
-See LICENSE file for details.
